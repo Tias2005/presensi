@@ -106,11 +106,11 @@ class _CameraFacePageState extends State<CameraFacePage> {
 
       setState(() {
         resultText = '''
-  Latitude : ${position.latitude}
-  Longitude: ${position.longitude}
-  Wajah terdeteksi: ${faces.isNotEmpty}
-  Jumlah wajah    : ${faces.length}
-  ''';
+          Latitude : ${position.latitude}
+          Longitude: ${position.longitude}
+          Wajah terdeteksi: ${faces.isNotEmpty}
+          Jumlah wajah    : ${faces.length}
+          ''';
       });
     } catch (e) {
       setState(() {
@@ -150,7 +150,7 @@ class _CameraFacePageState extends State<CameraFacePage> {
           Column(
             children: [
               AspectRatio(
-                aspectRatio: _cameraController.value.aspectRatio,
+                aspectRatio: 1,
                 child: CameraPreview(_cameraController),
               ),
               ElevatedButton(
