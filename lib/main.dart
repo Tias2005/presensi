@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:intl/intl.dart';
 
 late List<CameraDescription> cameras;
 
@@ -99,6 +100,10 @@ class _CameraFacePageState extends State<CameraFacePage> {
       final XFile photo = await _cameraController.takePicture();
       final File imageFile = File(photo.path);
 
+      final DateTime captureTime = DateTime.now();
+      final String formattedTime =
+        DateFormat('dd-MM-yyyy HH:mm:ss').format(captureTime);
+
       final position = await getLocation();
 
       final inputImage = InputImage.fromFile(imageFile);
@@ -108,6 +113,7 @@ class _CameraFacePageState extends State<CameraFacePage> {
         resultText = '''
           Latitude : ${position.latitude}
           Longitude: ${position.longitude}
+          Waktu    : $formattedTime
           Wajah terdeteksi: ${faces.isNotEmpty}
           Jumlah wajah    : ${faces.length}
           ''';
