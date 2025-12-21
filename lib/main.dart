@@ -33,6 +33,7 @@ class CameraFacePage extends StatefulWidget {
 
 class _CameraFacePageState extends State<CameraFacePage> {
   late CameraController _cameraController;
+  int selectedCameraIndex = 0;
   bool isReady = false;
   String resultText = '';
 
@@ -51,8 +52,9 @@ class _CameraFacePageState extends State<CameraFacePage> {
 
   Future<void> initCamera() async {
     _cameraController = CameraController(
-      cameras.first,
+      cameras[selectedCameraIndex],
       ResolutionPreset.medium,
+      enableAudio: false,
     );
     await _cameraController.initialize();
     setState(() => isReady = true);
@@ -62,13 +64,11 @@ class _CameraFacePageState extends State<CameraFacePage> {
   bool serviceEnabled;
   LocationPermission permission;
 
-  // 1️⃣ Cek GPS aktif atau tidak
   serviceEnabled = await Geolocator.isLocationServiceEnabled();
   if (!serviceEnabled) {
     throw Exception('GPS tidak aktif');
   }
 
-  // 2️⃣ Cek permission
   permission = await Geolocator.checkPermission();
   if (permission == LocationPermission.denied) {
     permission = await Geolocator.requestPermission();
@@ -82,7 +82,6 @@ class _CameraFacePageState extends State<CameraFacePage> {
     throw Exception('Izin lokasi ditolak permanen');
   }
 
-  // 3️⃣ Ambil lokasi
   return await Geolocator.getCurrentPosition(
     desiredAccuracy: LocationAccuracy.high,
   );
@@ -91,14 +90,11 @@ class _CameraFacePageState extends State<CameraFacePage> {
 
   Future<void> captureAndProcess() async {
   try {
-    // 1️⃣ Ambil foto
     final XFile photo = await _cameraController.takePicture();
     final File imageFile = File(photo.path);
 
-    // 2️⃣ Ambil lokasi
     final position = await getLocation();
 
-    // 3️⃣ Face detection
     final inputImage = InputImage.fromFile(imageFile);
     final faces = await faceDetector.processImage(inputImage);
 
@@ -128,6 +124,18 @@ Jumlah wajah    : ${faces.length}
 
     return Scaffold(
       appBar: AppBar(title: const Text('Camera + GPS + Face')),
+
+      floatingActionButton: FloatingActionButton(
+        child: const Icon(Icons.cameraswitch),
+        onPressed: () async {
+          selectedCameraIndex =
+              (selectedCameraIndex + 1) % cameras.length;
+
+          await _cameraController.dispose();
+          await initCamera();
+        },
+      ),
+
       body: Column(
         children: [
           AspectRatio(
@@ -136,7 +144,7 @@ Jumlah wajah    : ${faces.length}
           ),
           ElevatedButton(
             onPressed: captureAndProcess,
-            child: const Text('Ambil Foto & Deteksi Wajah'),
+            child: const Text('Ambil Foto Untuk Deteksi Wajah dan Lokasi'),
           ),
           Text(resultText),
         ],
