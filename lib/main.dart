@@ -35,6 +35,7 @@ class _CameraFacePageState extends State<CameraFacePage> {
   late CameraController _cameraController;
   int selectedCameraIndex = 0;
   bool isReady = false;
+  bool isProcessing = false;
   String resultText = '';
 
   final FaceDetector faceDetector = FaceDetector(
@@ -89,30 +90,38 @@ class _CameraFacePageState extends State<CameraFacePage> {
   
 
   Future<void> captureAndProcess() async {
-  try {
-    final XFile photo = await _cameraController.takePicture();
-    final File imageFile = File(photo.path);
+    try {
+      setState(() {
+        isProcessing = true;
+        resultText = '';
+      });
 
-    final position = await getLocation();
+      final XFile photo = await _cameraController.takePicture();
+      final File imageFile = File(photo.path);
 
-    final inputImage = InputImage.fromFile(imageFile);
-    final faces = await faceDetector.processImage(inputImage);
+      final position = await getLocation();
 
-    setState(() {
-      resultText = '''
-Latitude : ${position.latitude}
-Longitude: ${position.longitude}
-Wajah terdeteksi: ${faces.isNotEmpty}
-Jumlah wajah    : ${faces.length}
-''';
-    });
-  } catch (e) {
-    setState(() {
-      resultText = 'Error: $e';
-    });
+      final inputImage = InputImage.fromFile(imageFile);
+      final faces = await faceDetector.processImage(inputImage);
+
+      setState(() {
+        resultText = '''
+  Latitude : ${position.latitude}
+  Longitude: ${position.longitude}
+  Wajah terdeteksi: ${faces.isNotEmpty}
+  Jumlah wajah    : ${faces.length}
+  ''';
+      });
+    } catch (e) {
+      setState(() {
+        resultText = 'Error: $e';
+      });
+    } finally {
+      setState(() {
+        isProcessing = false;
+      });
+    }
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
@@ -136,17 +145,40 @@ Jumlah wajah    : ${faces.length}
         },
       ),
 
-      body: Column(
+      body: Stack(
         children: [
-          AspectRatio(
-            aspectRatio: _cameraController.value.aspectRatio,
-            child: CameraPreview(_cameraController),
+          Column(
+            children: [
+              AspectRatio(
+                aspectRatio: _cameraController.value.aspectRatio,
+                child: CameraPreview(_cameraController),
+              ),
+              ElevatedButton(
+                onPressed: isProcessing ? null : captureAndProcess,
+                child: const Text('Ambil Foto & Deteksi Wajah'),
+              ),
+              Text(resultText),
+            ],
           ),
-          ElevatedButton(
-            onPressed: captureAndProcess,
-            child: const Text('Ambil Foto Untuk Deteksi Wajah dan Lokasi'),
-          ),
-          Text(resultText),
+
+          if (isProcessing)
+            Container(
+              // ignore: deprecated_member_use
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 12),
+                    Text(
+                      'Memproses data...',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
