@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart'; 
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:intl/intl.dart';
 import 'package:image/image.dart' as img;
@@ -47,9 +48,9 @@ class _CameraFacePageState extends State<CameraFacePage> {
 
   late Interpreter _interpreter;
   List<double>? registeredEmbedding;
-  static const double threshold = 0.7; // Sesuaikan sensitivitas di sini
+  static const double threshold = 0.7; 
 
-  String resultText = 'Silahkan daftarkan wajah (Enroll) terlebih dahulu.';
+  String resultText = 'Silahkan daftarkan wajah terlebih dahulu.';
   LatLng? currentLatLng;
 
   final FaceDetector faceDetector = FaceDetector(
@@ -84,6 +85,19 @@ class _CameraFacePageState extends State<CameraFacePage> {
     } catch (e) {
       debugPrint("Error loading model: $e");
     }
+  }
+
+  Future<String> getAddressFromLatLng(double lat, double lng) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
+      if (placemarks.isNotEmpty) {
+        Placemark p = placemarks[0];
+        return "${p.name}, ${p.thoroughfare}, ${p.subLocality}";
+      }
+    } catch (e) {
+      debugPrint("Geocoding Error: $e");
+    }
+    return "Alamat tidak ditemukan";
   }
 
   Future<Position> getLocation() async {
@@ -140,7 +154,6 @@ class _CameraFacePageState extends State<CameraFacePage> {
     return dot / (sqrt(normA) * sqrt(normB));
   }
 
-  // ================= MAIN PROCESS =================
   Future<void> captureAndProcess() async {
     try {
       setState(() {
@@ -161,41 +174,38 @@ class _CameraFacePageState extends State<CameraFacePage> {
       final embedding = getEmbedding(faceImage);
 
       if (registeredEmbedding == null) {
-        // --- MODE ENROLL ---
         setState(() {
           registeredEmbedding = embedding;
           resultText = 'Input Berhasil!\nSilakan lakukan Verifikasi.';
         });
       } else {
-        // --- MODE VERIFY ---
         final similarity = cosineSimilarity(registeredEmbedding!, embedding);
         final bool isMatch = similarity >= threshold;
 
         if (isMatch) {
-          setState(() => resultText = 'Wajah Match! Sedang mengambil lokasi...');
+          setState(() => resultText = 'Wajah Match! Sedang mencari lokasi...');
           
-          // HANYA AMBIL LOKASI JIKA MATCH
           final position = await getLocation();
           final time = DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now());
+          
+          final String address = await getAddressFromLatLng(position.latitude, position.longitude);
 
           setState(() {
             currentLatLng = LatLng(position.latitude, position.longitude);
             resultText = '''
-              HASIL: WAJAH COCOK ✅
+              HASIL: WAJAH COCOK
               Waktu: $time
-              Lokasi: ${position.latitude}, ${position.longitude}
-              ''';
+              Tempat: $address
+                          ''';
           });
 
-          // Pindahkan peta ke posisi user
           Future.delayed(const Duration(milliseconds: 500), () {
             _mapController.move(currentLatLng!, 15.0);
           });
         } else {
-          // JIKA TIDAK MATCH
           setState(() {
-            currentLatLng = null; // Sembunyikan/Reset peta jika sebelumnya ada
-            resultText = 'HASIL: WAJAH TIDAK COCOK ❌\nSilahkan ambil foto ulang.';
+            currentLatLng = null; 
+            resultText = 'HASIL: WAJAH TIDAK COCOK \nSilahkan ambil foto ulang.';
           });
         }
       }
@@ -214,7 +224,6 @@ class _CameraFacePageState extends State<CameraFacePage> {
       appBar: AppBar(
         title: const Text('Face Match & Location'),
         actions: [
-          // Tombol Reset untuk mempermudah testing
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => setState(() {
