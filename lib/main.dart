@@ -47,9 +47,9 @@ class _CameraFacePageState extends State<CameraFacePage> {
 
   late Interpreter _interpreter;
   List<double>? registeredEmbedding;
-  static const double threshold = 0.7;
+  static const double threshold = 0.7; // Sesuaikan sensitivitas di sini
 
-  String resultText = 'Silahkan daftarkan wajah Anda terlebih dahulu.';
+  String resultText = 'Silahkan daftarkan wajah (Enroll) terlebih dahulu.';
   LatLng? currentLatLng;
 
   final FaceDetector faceDetector = FaceDetector(
@@ -88,14 +88,14 @@ class _CameraFacePageState extends State<CameraFacePage> {
 
   Future<Position> getLocation() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
-      throw Exception('GPS tidak aktif');
+      throw Exception('GPS tidak aktif, mohon aktifkan GPS Anda.');
     }
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.deniedForever) {
-      throw Exception('Izin lokasi ditolak permanen');
+      throw Exception('Izin lokasi ditolak permanen.');
     }
     return await Geolocator.getCurrentPosition();
   }
@@ -145,7 +145,7 @@ class _CameraFacePageState extends State<CameraFacePage> {
     try {
       setState(() {
         isProcessing = true;
-        resultText = 'Memproses...';
+        resultText = 'Mendeteksi wajah...';
       });
 
       final photo = await _cameraController.takePicture();
@@ -153,7 +153,7 @@ class _CameraFacePageState extends State<CameraFacePage> {
       final faces = await faceDetector.processImage(InputImage.fromFile(imageFile));
 
       if (faces.isEmpty) {
-        setState(() => resultText = 'Tidak ada wajah terdeteksi');
+        setState(() => resultText = 'Wajah tidak ditemukan. Coba lagi.');
         return;
       }
 
@@ -161,34 +161,43 @@ class _CameraFacePageState extends State<CameraFacePage> {
       final embedding = getEmbedding(faceImage);
 
       if (registeredEmbedding == null) {
-        // PROSES ENROLL (Tanpa Lokasi)
+        // --- MODE ENROLL ---
         setState(() {
           registeredEmbedding = embedding;
-          resultText = 'Wajah berhasil didaftarkan!\nSekarang Anda bisa melakukan verifikasi.';
+          resultText = 'Input Berhasil!\nSilakan lakukan Verifikasi.';
         });
       } else {
-        // PROSES VERIFY (Dengan Lokasi)
+        // --- MODE VERIFY ---
         final similarity = cosineSimilarity(registeredEmbedding!, embedding);
         final bool isMatch = similarity >= threshold;
-        
-        String recognitionResult = isMatch ? 'Wajah COCOK (MATCH)' : 'Wajah TIDAK COCOK';
 
-        final position = await getLocation();
-        final time = DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now());
+        if (isMatch) {
+          setState(() => resultText = 'Wajah Match! Sedang mengambil lokasi...');
+          
+          // HANYA AMBIL LOKASI JIKA MATCH
+          final position = await getLocation();
+          final time = DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now());
 
-        setState(() {
-          currentLatLng = LatLng(position.latitude, position.longitude);
-          resultText = '''
-Status: $recognitionResult
-Waktu: $time
-Lat: ${position.latitude}, Lng: ${position.longitude}
-''';
-        });
+          setState(() {
+            currentLatLng = LatLng(position.latitude, position.longitude);
+            resultText = '''
+              HASIL: WAJAH COCOK ✅
+              Waktu: $time
+              Lokasi: ${position.latitude}, ${position.longitude}
+              ''';
+          });
 
-        // Update peta
-        Future.delayed(const Duration(milliseconds: 500), () {
-          _mapController.move(currentLatLng!, 15.0);
-        });
+          // Pindahkan peta ke posisi user
+          Future.delayed(const Duration(milliseconds: 500), () {
+            _mapController.move(currentLatLng!, 15.0);
+          });
+        } else {
+          // JIKA TIDAK MATCH
+          setState(() {
+            currentLatLng = null; // Sembunyikan/Reset peta jika sebelumnya ada
+            resultText = 'HASIL: WAJAH TIDAK COCOK ❌\nSilahkan ambil foto ulang.';
+          });
+        }
       }
     } catch (e) {
       setState(() => resultText = 'Error: $e');
@@ -201,12 +210,21 @@ Lat: ${position.latitude}, Lng: ${position.longitude}
   Widget build(BuildContext context) {
     if (!isReady) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
-    // Logika Nama Tombol
-    String buttonLabel = registeredEmbedding == null ? 'Input Profil' : 'Recognition';
-    IconData buttonIcon = registeredEmbedding == null ? Icons.person_add : Icons.verified_user;
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Face Attendance')),
+      appBar: AppBar(
+        title: const Text('Face Match & Location'),
+        actions: [
+          // Tombol Reset untuk mempermudah testing
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => setState(() {
+              registeredEmbedding = null;
+              currentLatLng = null;
+              resultText = 'Data direset. Silahkan input profile ulang.';
+            }),
+          )
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           selectedCameraIndex = (selectedCameraIndex + 1) % cameras.length;
@@ -222,39 +240,49 @@ Lat: ${position.latitude}, Lng: ${position.longitude}
               aspectRatio: 1.2,
               child: CameraPreview(_cameraController),
             ),
-            const SizedBox(height: 15),
+            const SizedBox(height: 20),
             
-            // Tombol Dinamis
             ElevatedButton.icon(
               onPressed: (isProcessing || !isModelLoaded) ? null : captureAndProcess,
               icon: isProcessing 
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) 
-                : Icon(buttonIcon),
-              label: Text(buttonLabel),
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12)),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: Colors.blueGrey[50], borderRadius: BorderRadius.circular(8)),
-                child: Text(resultText, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Icon(registeredEmbedding == null ? Icons.person_add : Icons.location_on),
+              label: Text(registeredEmbedding == null ? 'Input Profile' : 'Recognition & Track Location'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: registeredEmbedding == null ? Colors.blue : Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),
 
-            // Peta hanya muncul jika sudah ada koordinat (setelah Verify)
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                ),
+                child: Text(
+                  resultText,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+
             if (currentLatLng != null)
               Container(
-                height: 200,
-                margin: const EdgeInsets.symmetric(horizontal: 16),
+                height: 220,
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.blueAccent),
-                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green, width: 2),
+                  borderRadius: BorderRadius.circular(15),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(13),
                   child: FlutterMap(
                     mapController: _mapController,
                     options: MapOptions(
@@ -270,9 +298,9 @@ Lat: ${position.latitude}, Lng: ${position.longitude}
                         markers: [
                           Marker(
                             point: currentLatLng!,
-                            width: 40,
-                            height: 40,
-                            child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                            width: 50,
+                            height: 50,
+                            child: const Icon(Icons.location_pin, color: Colors.red, size: 45),
                           ),
                         ],
                       ),
@@ -280,7 +308,7 @@ Lat: ${position.latitude}, Lng: ${position.longitude}
                   ),
                 ),
               ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 40),
           ],
         ),
       ),
