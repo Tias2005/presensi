@@ -1,10 +1,9 @@
-// lib/pages/login_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:developer' as dev;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../shared/theme.dart';
 import 'dashboard_page.dart';
 import 'face_register_page.dart';
 
@@ -18,12 +17,8 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passController = TextEditingController();
   bool _isLoading = false;
-  
-  // Warna Tema Website (Navy Blue)
-  final Color primaryColor = const Color(0xFF111827); 
 
   Future<void> _handleLogin() async {
-    // Validasi input sederhana
     if (_emailController.text.isEmpty || _passController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Email dan Password harus diisi"))
@@ -36,10 +31,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final response = await http.post(
         Uri.parse('http://192.168.229.178:8000/api/login-mobile'),
-        headers: {
-          'Accept': 'application/json',
-          // Header ini penting agar Laravel tahu kita minta response JSON
-        },
+        headers: {'Accept': 'application/json'},
         body: {
           'email': _emailController.text.trim(),
           'password': _passController.text,
@@ -50,38 +42,22 @@ class _LoginPageState extends State<LoginPage> {
 
       if (response.statusCode == 200) {
         final prefs = await SharedPreferences.getInstance();
-        
-        // 1. Simpan Token Sanctum yang asli dari Laravel
         await prefs.setString('token', data['token']);
-        
-        // 2. Simpan Data User
         await prefs.setString('user_data', jsonEncode(data['user']));
 
         if (!mounted) return;
         
-        // 3. Cek apakah user sudah daftar wajah (embedding_vector)
         final dynamic embedding = data['user']['embedding_vector'];
-        
-        // Logika pengecekan yang lebih kuat untuk null atau string kosong
         bool hasFaceData = embedding != null && 
                            embedding.toString().isNotEmpty && 
                            embedding.toString() != "null";
 
         if (!hasFaceData) {
-          // Jika belum ada data wajah, paksa ke halaman registrasi wajah
-          Navigator.pushReplacement(
-            context, 
-            MaterialPageRoute(builder: (context) => const FaceRegisterPage())
-          );
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const FaceRegisterPage()));
         } else {
-          // Jika sudah ada, langsung ke Dashboard
-          Navigator.pushReplacement(
-            context, 
-            MaterialPageRoute(builder: (context) => const DashboardPage())
-          );
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const DashboardPage()));
         }
       } else {
-        // Handle error seperti "Email tidak terdaftar" atau "Password salah"
         throw data['message'] ?? 'Gagal Terhubung ke Server';
       }
     } catch (e) {
@@ -97,34 +73,34 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header melengkung Navy
             Container(
-              height: 300,
-              decoration: BoxDecoration(
-                color: primaryColor,
-                borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(80)),
+              height: 350,
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.only(bottomLeft: Radius.circular(80)),
               ),
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    const SizedBox(height: 40),
                     Image.asset(
-                      'assets/images/logo_web.png', 
-                      height: 80, 
-                      errorBuilder: (c, e, s) => const Icon(Icons.verified_user, size: 80, color: Colors.white)
+                      'assets/logo/logo_aplikasi_presensi.png', 
+                      height: 120, 
+                      errorBuilder: (c, e, s) => const Icon(Icons.account_circle, size: 100, color: Colors.white)
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 20),
                     const Text(
-                      "Monitoring Presensi", 
-                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)
+                      "MONITORING PRESENSI", 
+                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 1.5)
                     ),
                     const Text(
-                      "Mobile App Karyawan", 
-                      style: TextStyle(color: Colors.white70)
+                      "Sistem Kehadiran Karyawan", 
+                      style: TextStyle(color: Colors.white70, fontSize: 14)
                     ),
                   ],
                 ),
@@ -132,7 +108,7 @@ class _LoginPageState extends State<LoginPage> {
             ),
             
             Padding(
-              padding: const EdgeInsets.all(30.0),
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 40),
               child: Column(
                 children: [
                   TextField(
@@ -140,35 +116,62 @@ class _LoginPageState extends State<LoginPage> {
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       labelText: "Email Karyawan",
-                      prefixIcon: Icon(Icons.email, color: primaryColor),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                      filled: true,
+                      fillColor: Colors.white,
+                      prefixIcon: const Icon(Icons.email_outlined, color: AppColors.primary),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: const BorderSide(color: AppColors.accent, width: 2),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),
+                  
                   TextField(
                     controller: _passController,
                     obscureText: true,
                     decoration: InputDecoration(
                       labelText: "Password",
-                      prefixIcon: Icon(Icons.lock, color: primaryColor),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                      filled: true,
+                      fillColor: Colors.white,
+                      prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primary),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: const BorderSide(color: AppColors.accent, width: 2),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 40),
+                  
                   SizedBox(
                     width: double.infinity,
                     height: 55,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _handleLogin,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 5,
+                        shadowColor: AppColors.primary.withValues(alpha: 0.4),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       ),
                       child: _isLoading 
-                        ? const CircularProgressIndicator(color: Colors.white) 
+                        ? const SizedBox(
+                            height: 20, 
+                            width: 20, 
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                          ) 
                         : const Text(
                             "MASUK", 
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.1)
                           ),
                     ),
                   ),
