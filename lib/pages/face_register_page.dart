@@ -8,7 +8,7 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../shared/theme.dart'; // Import tema warna
+import '../shared/theme.dart'; 
 import 'dashboard_page.dart';
 
 class FaceRegisterPage extends StatefulWidget {
@@ -34,7 +34,6 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
 
   Future<void> _initScanner() async {
     final cameras = await availableCameras();
-    // Gunakan kamera depan (biasanya index 1)
     _controller = CameraController(cameras[1], ResolutionPreset.high);
     await _controller.initialize();
     _interpreter = await Interpreter.fromAsset('assets/models/mobilefacenet.tflite');
@@ -136,7 +135,6 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
       ),
       body: Stack(
         children: [
-          // Background Kamera
           Center(
             child: AspectRatio(
               aspectRatio: 1 / _controller.value.aspectRatio,
@@ -144,7 +142,6 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
             ),
           ),
 
-          // Overlay Bingkai Lingkaran
           ColorFiltered(
             colorFilter: ColorFilter.mode(
               Colors.black.withValues(alpha: 0.7),
@@ -169,7 +166,6 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
             ),
           ),
 
-          // Border Lingkaran (Glow Effect)
           Align(
             alignment: Alignment.center,
             child: Container(
@@ -183,7 +179,6 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
             ),
           ),
 
-          // Instruksi Teks
           Column(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [

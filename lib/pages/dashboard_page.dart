@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'profile_page.dart'; // Pastikan file ini sudah dibuat
+import 'profile_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -15,7 +15,6 @@ class _DashboardPageState extends State<DashboardPage> {
   int _currentIndex = 0;
   String _userName = "Memuat...";
 
-  // List halaman untuk navigasi
   late List<Widget> _pages;
 
   @override
@@ -23,9 +22,9 @@ class _DashboardPageState extends State<DashboardPage> {
     super.initState();
     _loadUserData();
     _pages = [
-        const DashboardContent(), // Index 0: Beranda
-        const Center(child: Text("Halaman Riwayat (Segera Hadir)")), // Index 1: Riwayat (Tambahkan ini sebagai placeholder)
-        const ProfilePage(),      // Index 2: Profil
+        const DashboardContent(), 
+        const Center(child: Text("Halaman Riwayat (Segera Hadir)")),
+        const ProfilePage(),
       ];
   }
 
@@ -44,8 +43,6 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[200],
-      // AppBar hanya muncul jika sedang di halaman Beranda (index 0)
-      // Karena ProfilePage biasanya punya AppBar sendiri
       appBar: _currentIndex == 0 
         ? AppBar(
             backgroundColor: Colors.white,
@@ -77,12 +74,12 @@ class _DashboardPageState extends State<DashboardPage> {
             _currentIndex = index;
           });
         },
-        selectedItemColor: const Color(0xFF111827), // Navy
+        selectedItemColor: const Color(0xFF111827), 
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: "Beranda"),
-          BottomNavigationBarItem(icon: Icon(Icons.assignment_outlined), label: "Riwayat"), // Placeholder Riwayat
+          BottomNavigationBarItem(icon: Icon(Icons.assignment_outlined), label: "Riwayat"),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: "Profil"),
         ],
       ),
@@ -90,7 +87,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// Widget terpisah untuk isi konten Dashboard agar rapi
 class DashboardContent extends StatelessWidget {
   const DashboardContent({super.key});
 
@@ -104,7 +100,6 @@ class DashboardContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Card Jam & Waktu
           Container(
             padding: const EdgeInsets.all(20),
             width: double.infinity,
@@ -125,7 +120,6 @@ class DashboardContent extends StatelessWidget {
           
           const SizedBox(height: 25),
           
-          // Status Presensi (Check In / Out)
           const Text("Status Presensi Hari Ini", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 15),
           Row(
@@ -138,7 +132,6 @@ class DashboardContent extends StatelessWidget {
 
           const SizedBox(height: 25),
           
-          // Menu Pengajuan
           const Text("Ajukan Pengajuan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 15),
           Container(
