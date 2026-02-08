@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../shared/theme.dart';
 import 'profile_page.dart';
 import 'calendar_page.dart'; 
+import 'form_pengajuan_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -127,7 +128,7 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-Widget _buildDashboardContent() {
+  Widget _buildDashboardContent() {
     String currentTime = DateFormat('HH.mm').format(DateTime.now());
     String currentDate = DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(DateTime.now());
 
@@ -252,10 +253,15 @@ Widget _buildDashboardContent() {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildMenuItem(Icons.edit_note, "Izin", onTap: () {
-                }),
-                _buildMenuItem(Icons.work_history, "Cuti"),
-                _buildMenuItem(Icons.more_time, "Lembur"),
+                  _buildMenuItem(Icons.edit_note, "Izin", onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const FormPengajuanPage(tipe: "Izin", idKategori: 1)));
+                  }),
+                  _buildMenuItem(Icons.work_history, "Cuti", onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const FormPengajuanPage(tipe: "Cuti", idKategori: 2)));
+                  }),
+                  _buildMenuItem(Icons.more_time, "Lembur", onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const FormPengajuanPage(tipe: "Lembur", idKategori: 3)));
+                  }),
               ],
             ),
           ),
