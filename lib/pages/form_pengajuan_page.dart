@@ -25,19 +25,51 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
   TimeOfDay? _jamSelesai;
   File? _imageFile;
   bool _isSubmitting = false;
+  
+  int? _sisaCuti;
 
-Future<void> _pickFile() async {
-  FilePickerResult? result = await FilePicker.platform.pickFiles(
-    type: FileType.custom,
-    allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'],
-  );
-
-  if (result != null && result.files.single.path != null) {
-    setState(() {
-      _imageFile = File(result.files.single.path!);
-    });
+  @override
+  void initState() {
+    super.initState();
+    if (widget.tipe == "Cuti") {
+      _fetchSisaCuti();
+    }
   }
-}
+
+  Future<void> _fetchSisaCuti() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userDataString = prefs.getString('user_data');
+      if (userDataString == null) return;
+      
+      final userData = jsonDecode(userDataString);
+      final response = await http.get(
+        Uri.parse("http://192.168.229.178:8000/api/jatah-cuti/karyawan/${userData['id_user']}"),
+      );
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        setState(() {
+          _sisaCuti = result['data']['sisa'] ?? 0;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetch sisa cuti: $e");
+    }
+  }
+
+  Future<void> _pickFile() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'],
+    );
+
+    if (result != null && result.files.single.path != null) {
+      setState(() {
+        _imageFile = File(result.files.single.path!);
+      });
+    }
+  }
 
   Future<void> _selectDate(BuildContext context, bool isMulai) async {
     final DateTime? picked = await showDatePicker(
@@ -59,85 +91,85 @@ Future<void> _pickFile() async {
     }
   }
 
-Future<void> _submitForm() async {
-  if (_tglMulai == null || _alasanController.text.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Mohon isi tanggal dan alasan")),
-    );
-    return;
-  }
+  Future<void> _submitForm() async {
+    if (_tglMulai == null || _alasanController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Mohon isi tanggal dan alasan")),
+      );
+      return;
+    }
 
-  if (widget.tipe == "Lembur" && (_jamMulai == null || _jamSelesai == null)) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Mohon isi jam mulai dan jam selesai lembur")),
-    );
-    return;
-  }
+    if (widget.tipe == "Lembur" && (_jamMulai == null || _jamSelesai == null)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Mohon isi jam mulai dan jam selesai lembur")),
+      );
+      return;
+    }
 
-  setState(() => _isSubmitting = true);
+    setState(() => _isSubmitting = true);
 
-  final scaffoldMessenger = ScaffoldMessenger.of(context);
-  
-  final prefs = await SharedPreferences.getInstance();
-  final userDataString = prefs.getString('user_data');
-  
-  if (userDataString == null) {
-    if (mounted) setState(() => _isSubmitting = false);
-    return;
-  }
-  
-  final userData = jsonDecode(userDataString);
-
-  try {
-    var request = http.MultipartRequest(
-      'POST', 
-      Uri.parse("http://192.168.229.178:8000/api/pengajuan/store")
-    );
-
-    request.fields['id_user'] = userData['id_user'].toString();
-    request.fields['id_kategori_pengajuan'] = widget.idKategori.toString();
-    request.fields['alasan'] = _alasanController.text;
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final prefs = await SharedPreferences.getInstance();
+    final userDataString = prefs.getString('user_data');
     
-    String tglMulaiStr = DateFormat('yyyy-MM-dd').format(_tglMulai!);
-    request.fields['tanggal_mulai'] = tglMulaiStr;
+    if (userDataString == null) {
+      if (mounted) setState(() => _isSubmitting = false);
+      return;
+    }
+    
+    final userData = jsonDecode(userDataString);
 
-    if (widget.tipe == "Lembur") {
-      request.fields['tanggal_selesai'] = tglMulaiStr;
+    try {
+      var request = http.MultipartRequest(
+        'POST', 
+        Uri.parse("http://192.168.229.178:8000/api/pengajuan/store")
+      );
+
+      request.fields['id_user'] = userData['id_user'].toString();
+      request.fields['id_kategori_pengajuan'] = widget.idKategori.toString();
+      request.fields['alasan'] = _alasanController.text;
       
-      request.fields['jam_mulai'] = "${_jamMulai!.hour.toString().padLeft(2, '0')}:${_jamMulai!.minute.toString().padLeft(2, '0')}";
-      request.fields['jam_selesai'] = "${_jamSelesai!.hour.toString().padLeft(2, '0')}:${_jamSelesai!.minute.toString().padLeft(2, '0')}";
-    } else {
-      if (_tglSelesai != null) {
-        request.fields['tanggal_selesai'] = DateFormat('yyyy-MM-dd').format(_tglSelesai!);
+      String tglMulaiStr = DateFormat('yyyy-MM-dd').format(_tglMulai!);
+      request.fields['tanggal_mulai'] = tglMulaiStr;
+
+      if (widget.tipe == "Lembur") {
+        request.fields['tanggal_selesai'] = tglMulaiStr;
+        request.fields['jam_mulai'] = "${_jamMulai!.hour.toString().padLeft(2, '0')}:${_jamMulai!.minute.toString().padLeft(2, '0')}";
+        request.fields['jam_selesai'] = "${_jamSelesai!.hour.toString().padLeft(2, '0')}:${_jamSelesai!.minute.toString().padLeft(2, '0')}";
+      } else {
+        if (_tglSelesai != null) {
+          request.fields['tanggal_selesai'] = DateFormat('yyyy-MM-dd').format(_tglSelesai!);
+        }
       }
-    }
 
-    if (_imageFile != null) {
-      request.files.add(await http.MultipartFile.fromPath('lampiran', _imageFile!.path));
-    }
+      if (_imageFile != null) {
+        request.files.add(await http.MultipartFile.fromPath('lampiran', _imageFile!.path));
+      }
 
-    var response = await request.send();
+      var response = await request.send();
+      // final respBody = await response.stream.bytesToString();
+      // final decodedResp = jsonDecode(respBody);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if (response.statusCode == 200) {
-      _showSuccessDialog();
-    } else {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text("Gagal mengirim pengajuan (Error: ${response.statusCode})")),
-      );
+      if (response.statusCode == 200) {
+        _showSuccessDialog();
+      } else {
+        final respBody = await response.stream.bytesToString();
+        final decodedResp = jsonDecode(respBody);
+        _showErrorDialog(decodedResp['message'] ?? "Gagal mengirim pengajuan");
+      }
+    } catch (e) {
+      debugPrint("Error submit: $e");
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(content: Text("Terjadi kesalahan koneksi ke server")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
-  } catch (e) {
-    debugPrint("Error submit: $e");
-    if (mounted) {
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(content: Text("Terjadi kesalahan koneksi ke server")),
-      );
-    }
-  } finally {
-    if (mounted) setState(() => _isSubmitting = false);
   }
-}
 
   void _showSuccessDialog() {
     showDialog(
@@ -152,9 +184,44 @@ Future<void> _submitForm() async {
             child: TextButton(
               onPressed: () {
                 Navigator.pop(context);
-                Navigator.pop(context);
+                Navigator.pop(context, true); 
               },
               child: const Text("OK", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: true, 
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 60),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "Jatah Tidak Mencukupi",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          Center(
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Tutup", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
             ),
           ),
         ],
@@ -177,8 +244,31 @@ Future<void> _submitForm() async {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Detail ${widget.tipe}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 20),
+            Center(
+              child: Text(
+                "Detail ${widget.tipe}", 
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24, color: AppColors.primary)
+              ),
+            ),
+            
+            if (widget.tipe == "Cuti") ...[
+              const SizedBox(height: 10),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    "Sisa Jatah Cuti: ${_sisaCuti ?? '-'} Hari",
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.primary),
+                  ),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 30),
             
             _buildDatePicker(
               label: widget.tipe == "Lembur" ? "Tanggal Lembur" : "Tanggal Mulai",
