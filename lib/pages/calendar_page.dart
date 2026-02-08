@@ -19,7 +19,7 @@ class _CalendarPageState extends State<CalendarPage> {
   bool _isLoading = true;
 
   Map<DateTime, String> _holidayMap = {};
-  Map<DateTime, String> _presenceMap = {};
+  // Map<DateTime, String> _presenceMap = {};
   Map<int, bool> _workDayConfig = {}; 
 
   @override
@@ -41,18 +41,12 @@ class _CalendarPageState extends State<CalendarPage> {
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
         final List holidays = result['data']['holidays'];
-        final List presensi = result['data']['presensi'];
         final List jadwal = result['data']['jadwal'];
 
         setState(() {
           _holidayMap = {
             for (var item in holidays)
               _normalizeDate(DateTime.parse(item['tanggal_libur'])): item['nama_libur']
-          };
-
-          _presenceMap = {
-            for (var item in presensi)
-              _normalizeDate(DateTime.parse(item['tanggal'])): item['status_presensi']['nama_status'] ?? "Hadir"
           };
 
           _workDayConfig = {
@@ -131,13 +125,7 @@ class _CalendarPageState extends State<CalendarPage> {
             int dayIndex = day.weekday == 7 ? 0 : day.weekday;
             bool isWorkDay = _workDayConfig[dayIndex] ?? true;
 
-            if (_holidayMap.containsKey(cleanDay)) {
-              return _calendarBox(day.day.toString(), Colors.red.shade50, Colors.red);
-            }
-            if (_presenceMap.containsKey(cleanDay) && _presenceMap[cleanDay] != "Hadir") {
-              return _calendarBox(day.day.toString(), Colors.orange.shade50, Colors.orange);
-            }
-            if (!isWorkDay) {
+            if (_holidayMap.containsKey(cleanDay) || !isWorkDay) {
               return _calendarBox(day.day.toString(), Colors.red.shade50, Colors.red);
             }
             return _calendarBox(day.day.toString(), AppColors.primary.withValues(alpha: 0.05), AppColors.primary);
@@ -168,16 +156,12 @@ class _CalendarPageState extends State<CalendarPage> {
       statusText = "Libur Nasional: ${_holidayMap[cleanSelected]}";
       statusColor = Colors.red;
     } 
-    else if (_presenceMap.containsKey(cleanSelected) && _presenceMap[cleanSelected] != "Hadir") {
-      statusText = "Status: ${_presenceMap[cleanSelected]}";
-      statusColor = Colors.orange;
-    } 
     else {
       if (isWorkDay) {
-        statusText = "Hari Kerja Biasa : Masuk";
+        statusText = "Jadwal: Masuk Kerja";
         statusColor = AppColors.primary;
       } else {
-        statusText = "Hari Kerja Biasa : Libur";
+        statusText = "Jadwal: Libur Kerja";
         statusColor = Colors.red;
       }
     }
@@ -212,10 +196,10 @@ class _CalendarPageState extends State<CalendarPage> {
     return Padding(
       padding: const EdgeInsets.all(15),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           _legendItem(Colors.red, "Libur"),
-          _legendItem(Colors.orange, "Izin/Cuti/Lembur"),
+          const SizedBox(width: 30),
           _legendItem(AppColors.primary, "Masuk"),
         ],
       ),

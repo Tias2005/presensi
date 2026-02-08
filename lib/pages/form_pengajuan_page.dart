@@ -26,7 +26,6 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
   File? _imageFile;
   bool _isSubmitting = false;
 
-// Ganti ImagePicker dengan FilePicker
 Future<void> _pickFile() async {
   FilePickerResult? result = await FilePicker.platform.pickFiles(
     type: FileType.custom,
@@ -46,7 +45,7 @@ Future<void> _pickFile() async {
       initialDate: DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
-      initialEntryMode: DatePickerEntryMode.calendarOnly, // Menghilangkan ikon pena
+      initialEntryMode: DatePickerEntryMode.calendarOnly, 
     );
 
     if (picked != null && mounted) {
@@ -61,7 +60,6 @@ Future<void> _pickFile() async {
   }
 
 Future<void> _submitForm() async {
-  // 1. Validasi Input Awal
   if (_tglMulai == null || _alasanController.text.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Mohon isi tanggal dan alasan")),
@@ -69,7 +67,6 @@ Future<void> _submitForm() async {
     return;
   }
 
-  // Khusus lembur, pastikan jam sudah dipilih
   if (widget.tipe == "Lembur" && (_jamMulai == null || _jamSelesai == null)) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Mohon isi jam mulai dan jam selesai lembur")),
@@ -79,7 +76,6 @@ Future<void> _submitForm() async {
 
   setState(() => _isSubmitting = true);
 
-  // Menyimpan ScaffoldMessengerState sebelum proses async agar aman dari 'async gaps'
   final scaffoldMessenger = ScaffoldMessenger.of(context);
   
   final prefs = await SharedPreferences.getInstance();
@@ -98,43 +94,35 @@ Future<void> _submitForm() async {
       Uri.parse("http://192.168.229.178:8000/api/pengajuan/store")
     );
 
-    // Data Dasar
     request.fields['id_user'] = userData['id_user'].toString();
     request.fields['id_kategori_pengajuan'] = widget.idKategori.toString();
     request.fields['alasan'] = _alasanController.text;
     
-    // Format Tanggal Mulai
     String tglMulaiStr = DateFormat('yyyy-MM-dd').format(_tglMulai!);
     request.fields['tanggal_mulai'] = tglMulaiStr;
 
     if (widget.tipe == "Lembur") {
-      // PERBAIKAN: Kirim tanggal_selesai (disamakan dengan mulai) agar database tidak menolak nilai null
       request.fields['tanggal_selesai'] = tglMulaiStr;
       
-      // PERBAIKAN: Format jam menjadi HH:mm (2 digit) agar valid di database Laravel
       request.fields['jam_mulai'] = "${_jamMulai!.hour.toString().padLeft(2, '0')}:${_jamMulai!.minute.toString().padLeft(2, '0')}";
       request.fields['jam_selesai'] = "${_jamSelesai!.hour.toString().padLeft(2, '0')}:${_jamSelesai!.minute.toString().padLeft(2, '0')}";
     } else {
-      // Untuk Izin/Cuti
       if (_tglSelesai != null) {
         request.fields['tanggal_selesai'] = DateFormat('yyyy-MM-dd').format(_tglSelesai!);
       }
     }
 
-    // Lampiran jika ada
     if (_imageFile != null) {
       request.files.add(await http.MultipartFile.fromPath('lampiran', _imageFile!.path));
     }
 
     var response = await request.send();
 
-    // GUARD: Proteksi async gap dengan mounted check
     if (!mounted) return;
 
     if (response.statusCode == 200) {
       _showSuccessDialog();
     } else {
-      // Menampilkan error menggunakan referensi state yang disimpan sebelumnya
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text("Gagal mengirim pengajuan (Error: ${response.statusCode})")),
       );
@@ -163,8 +151,8 @@ Future<void> _submitForm() async {
           Center(
             child: TextButton(
               onPressed: () {
-                Navigator.pop(context); // Tutup dialog
-                Navigator.pop(context); // Kembali ke Dashboard
+                Navigator.pop(context);
+                Navigator.pop(context);
               },
               child: const Text("OK", style: TextStyle(fontWeight: FontWeight.bold)),
             ),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'dart:developer' as developer; 
 import '../shared/theme.dart';
 import 'login_page.dart';
 
@@ -51,8 +50,6 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     }
 
-    developer.log("Memuat URL Foto: $_baseUrl${_userData!['foto_profil']}", name: 'ProfilePage');
-
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -60,34 +57,38 @@ class _ProfilePageState extends State<ProfilePage> {
         backgroundColor: Colors.white,
         elevation: 0.5,
         actions: [
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.settings, color: AppColors.primary),
-            onPressed: () {
-              showModalBottomSheet(
-                context: context,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                builder: (context) => Column(
-                  mainAxisSize: MainAxisSize.min,
+            offset: const Offset(0, 50),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            onSelected: (value) {
+              if (value == 'edit') {
+              } else if (value == 'logout') {
+                _logout();
+              }
+            },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem<String>(
+                value: 'edit',
+                child: Row(
                   children: [
-                    ListTile(
-                      leading: const Icon(Icons.edit, color: AppColors.primary),
-                      title: const Text("Edit Profil"),
-                      onTap: () {
-                        Navigator.pop(context);
-                      },
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.logout, color: Colors.redAccent),
-                      title: const Text("Keluar Aplikasi"),
-                      onTap: _logout,
-                    ),
-                    const SizedBox(height: 10),
+                    Icon(Icons.edit_outlined, color: AppColors.primary, size: 20),
+                    SizedBox(width: 10),
+                    Text("Edit Profil"),
                   ],
                 ),
-              );
-            },
+              ),
+              const PopupMenuItem<String>(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Colors.redAccent, size: 20),
+                    SizedBox(width: 10),
+                    Text("Keluar", style: TextStyle(color: Colors.redAccent)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -118,10 +119,6 @@ class _ProfilePageState extends State<ProfilePage> {
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return const Icon(Icons.person, size: 70, color: AppColors.primary);
-                              },
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return const CircularProgressIndicator();
                               },
                             )
                           : const Icon(Icons.person, size: 70, color: AppColors.primary),
