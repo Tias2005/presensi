@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../shared/theme.dart';
 import 'login_page.dart';
+import 'edit_profile_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -61,8 +62,13 @@ class _ProfilePageState extends State<ProfilePage> {
             icon: const Icon(Icons.settings, color: AppColors.primary),
             offset: const Offset(0, 50),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            onSelected: (value) {
+            onSelected: (value) async {
               if (value == 'edit') {
+                final result = await Navigator.push(
+                  context, 
+                  MaterialPageRoute(builder: (context) => EditProfilePage(userData: _userData!))
+                );
+                if (result == true) _loadProfile();
               } else if (value == 'logout') {
                 _logout();
               }
