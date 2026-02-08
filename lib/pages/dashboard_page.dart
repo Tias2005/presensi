@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../shared/theme.dart';
 import 'profile_page.dart';
+import 'calendar_page.dart'; 
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -17,6 +18,7 @@ class _DashboardPageState extends State<DashboardPage> {
   int _currentIndex = 0;
   String _userName = "Memuat...";
   Map<String, dynamic>? _todayPresence;
+  Map<String, dynamic>? _userStats;
   bool _isLoading = true;
 
   @override
@@ -30,12 +32,21 @@ class _DashboardPageState extends State<DashboardPage> {
     final userDataString = prefs.getString('user_data');
     if (userDataString != null) {
       final userData = jsonDecode(userDataString);
+      String userId = userData['id_user'].toString();
+      
       setState(() {
         _userName = userData['nama_user'] ?? "Karyawan";
       });
-      await _fetchTodayPresence(userData['id_user'].toString());
+
+      await Future.wait([
+        _fetchTodayPresence(userId),
+        _fetchUserStats(userId),
+      ]);
     }
   }
+
+  String _displayMessage = "";
+  String _statusType = "work";
 
   Future<void> _fetchTodayPresence(String userId) async {
     try {
@@ -43,6 +54,8 @@ class _DashboardPageState extends State<DashboardPage> {
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
         setState(() {
+          _statusType = result['status'];
+          _displayMessage = result['message'] ?? "";
           _todayPresence = result['data'];
           _isLoading = false;
         });
@@ -50,6 +63,15 @@ class _DashboardPageState extends State<DashboardPage> {
     } catch (e) {
       debugPrint("Error fetch presensi: $e");
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchUserStats(String userId) async {
+    final response = await http.get(Uri.parse("http://192.168.229.178:8000/api/user-stats/$userId"));
+    if (response.statusCode == 200) {
+      setState(() {
+        _userStats = jsonDecode(response.body)['data'];
+      });
     }
   }
 
@@ -105,7 +127,7 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildDashboardContent() {
+Widget _buildDashboardContent() {
     String currentTime = DateFormat('HH.mm').format(DateTime.now());
     String currentDate = DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(DateTime.now());
 
@@ -114,61 +136,155 @@ class _DashboardPageState extends State<DashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Jam Box
           Container(
             padding: const EdgeInsets.all(20),
             width: double.infinity,
             decoration: BoxDecoration(
-              color: AppColors.white, 
-              borderRadius: BorderRadius.circular(15),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)]
-            ),
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5))
+                ]),
             child: Column(
               children: [
                 const Text("Waktu Sekarang", style: TextStyle(color: AppColors.grey)),
-                Text(currentTime, style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: AppColors.primary, letterSpacing: 2)),
+                Text(currentTime,
+                    style: const TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                        letterSpacing: 2)),
                 Text(currentDate, style: const TextStyle(color: AppColors.grey)),
               ],
             ),
           ),
-          
+
           const SizedBox(height: 25),
-          const Text("Status Presensi Hari Ini", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary)),
-          const SizedBox(height: 15),
-          
+
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStatusCard(
-                "Check In", 
-                _todayPresence?['jam_masuk'] ?? "-- : --", 
-                _todayPresence?['lokasi'] ?? "-", 
-                _todayPresence?['jam_masuk'] != null
-              ),
-              const SizedBox(width: 15),
-              _buildStatusCard(
-                "Check Out", 
-                _todayPresence?['jam_pulang'] ?? "-- : --", 
-                _todayPresence?['lokasi'] ?? "-", 
-                _todayPresence?['jam_pulang'] != null
+              const Text("Status Presensi Hari Ini",
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: AppColors.primary)),
+              IconButton(
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const CalendarPage()));
+                },
+                icon: const Icon(Icons.calendar_month_outlined, color: AppColors.primary),
+                tooltip: "Lihat Kalender",
               ),
             ],
           ),
+          const SizedBox(height: 10),
+
+          if (_statusType == 'success')
+            Row(
+              children: [
+                _buildStatusCard(
+                    "Check In",
+                    _todayPresence?['jam_masuk'] ?? "-- : --",
+                    _todayPresence?['lokasi'] ?? "-",
+                    _todayPresence?['jam_masuk'] != null),
+                const SizedBox(width: 15),
+                _buildStatusCard(
+                    "Check Out",
+                    _todayPresence?['jam_pulang'] ?? "-- : --",
+                    _todayPresence?['lokasi'] ?? "-",
+                    _todayPresence?['jam_pulang'] != null),
+              ],
+            )
+          else
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: _statusType == 'holiday' 
+                    ? Colors.red.withValues(alpha: 0.05) 
+                    : Colors.orange.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                  color: _statusType == 'holiday' ? Colors.red.withValues(alpha: 0.3) : Colors.orange.withValues(alpha: 0.3)
+                )
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    _statusType == 'holiday' ? Icons.celebration : Icons.event_busy,
+                    color: _statusType == 'holiday' ? Colors.red : Colors.orange,
+                    size: 40,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    _statusType == 'holiday' ? "HARI LIBUR" : "TIDAK ADA JADWAL",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: _statusType == 'holiday' ? Colors.red : Colors.orange,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    _displayMessage.isNotEmpty ? _displayMessage : "Hari ini Anda tidak dijadwalkan untuk presensi.",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 13, color: Colors.black54),
+                  ),
+                ],
+              ),
+            ),
 
           const SizedBox(height: 25),
-          const Text("Ajukan Pengajuan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary)),
+
+          const Text("Ajukan Pengajuan",
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppColors.primary)),
           const SizedBox(height: 15),
           Container(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(15)),
+            decoration: BoxDecoration(
+                color: AppColors.white, borderRadius: BorderRadius.circular(15)),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildMenuItem(Icons.calendar_month, "Izin"),
+                _buildMenuItem(Icons.edit_note, "Izin", onTap: () {
+                }),
                 _buildMenuItem(Icons.work_history, "Cuti"),
                 _buildMenuItem(Icons.more_time, "Lembur"),
               ],
             ),
           ),
+
+          const SizedBox(height: 25),
+          const Text("Statistik Bulan Ini",
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppColors.primary)),
+          const SizedBox(height: 15),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+            color: AppColors.white, borderRadius: BorderRadius.circular(15)),
+            child: Column(
+              children: [
+                _buildStatRow("Hadir", _userStats?['hadir'] ?? "0 hari"),
+                const Divider(height: 20),
+                _buildStatRow("Terlambat", _userStats?['terlambat'] ?? "0 kali"),
+                const Divider(height: 20),
+                _buildStatRow("Izin/Cuti", _userStats?['izin_cuti'] ?? "0 hari"),
+                const Divider(height: 20),
+                _buildStatRow("Lembur", _userStats?['lembur'] ?? "0 jam"),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
         ],
       ),
     );
@@ -212,16 +328,29 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String label) {
-    return Column(
+  Widget _buildMenuItem(IconData icon, String label, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 60, height: 60,
+            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: AppColors.primary, size: 30),
+          ),
+          const SizedBox(height: 8),
+          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.primary)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Container(
-          width: 60, height: 60,
-          decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
-          child: Icon(icon, color: AppColors.primary, size: 30),
-        ),
-        const SizedBox(height: 8),
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.primary)),
+        Text(label, style: const TextStyle(color: AppColors.grey, fontSize: 14)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 14)),
       ],
     );
   }
