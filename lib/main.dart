@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/date_symbol_data_local.dart'; // 1. Tambahkan import ini
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'pages/login_page.dart';
 import 'pages/dashboard_page.dart';
 
@@ -9,8 +10,7 @@ late List<CameraDescription> cameras;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // 2. Inisialisasi data bahasa (Locale) sebelum app jalan
+  await Firebase.initializeApp();
   await initializeDateFormatting('id_ID', null);
   
   cameras = await availableCameras();
@@ -40,7 +40,6 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
         useMaterial3: true,
       ),
-      // Gunakan lokasi default Indonesia agar widget format tanggal tidak error
       locale: const Locale('id', 'ID'), 
       home: isLoggedIn ? const DashboardPage() : const LoginPage(),
     );
