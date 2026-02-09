@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/theme.dart';
+import '../config.dart';
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key});
@@ -36,7 +37,7 @@ class _CalendarPageState extends State<CalendarPage> {
 
     try {
       final response = await http.get(Uri.parse(
-          "http://192.168.229.178:8000/api/presensi/calendar/$userId?month=${_focusedDay.month}&year=${_focusedDay.year}"));
+          "${AppConfig.apiUrl}/presensi/calendar/$userId?month=${_focusedDay.month}&year=${_focusedDay.year}"));
 
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);

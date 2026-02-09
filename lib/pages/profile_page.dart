@@ -4,6 +4,8 @@ import 'dart:convert';
 import '../shared/theme.dart';
 import 'login_page.dart';
 import 'edit_profile_page.dart';
+import '../config.dart';
+
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -14,7 +16,7 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   Map<String, dynamic>? _userData;
-  final String _baseUrl = "http://192.168.229.178:8000/storage/"; 
+  final String _baseUrl = AppConfig.storageUrl;
 
   @override
   void initState() {

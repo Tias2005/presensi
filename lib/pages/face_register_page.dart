@@ -10,6 +10,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/theme.dart'; 
 import 'dashboard_page.dart';
+import '../config.dart';
+
 
 class FaceRegisterPage extends StatefulWidget {
   const FaceRegisterPage({super.key});
@@ -81,7 +83,7 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
       String postgresArray = "{${embedding.join(',')}}";
 
       var request = http.MultipartRequest('POST',
-          Uri.parse('http://192.168.229.178:8000/api/user/register-face'));
+          Uri.parse('${AppConfig.apiUrl}/user/register-face'));
 
       request.fields['id_user'] = idUser;
       request.fields['embedding'] = postgresArray;

@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
 import '../shared/theme.dart';
+import '../config.dart';
+
 
 class FormPengajuanPage extends StatefulWidget {
   final String tipe; 
@@ -44,7 +46,7 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
       
       final userData = jsonDecode(userDataString);
       final response = await http.get(
-        Uri.parse("http://192.168.229.178:8000/api/jatah-cuti/karyawan/${userData['id_user']}"),
+        Uri.parse("${AppConfig.apiUrl}/jatah-cuti/karyawan/${userData['id_user']}"),
       );
 
       if (response.statusCode == 200) {
@@ -122,7 +124,7 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
     try {
       var request = http.MultipartRequest(
         'POST', 
-        Uri.parse("http://192.168.229.178:8000/api/pengajuan/store")
+        Uri.parse("${AppConfig.apiUrl}/pengajuan/store")
       );
 
       request.fields['id_user'] = userData['id_user'].toString();

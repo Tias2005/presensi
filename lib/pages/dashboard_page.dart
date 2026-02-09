@@ -7,6 +7,8 @@ import '../shared/theme.dart';
 import 'profile_page.dart';
 import 'calendar_page.dart'; 
 import 'form_pengajuan_page.dart';
+import '../config.dart';
+
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -51,7 +53,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _fetchTodayPresence(String userId) async {
     try {
-      final response = await http.get(Uri.parse("http://192.168.229.178:8000/api/presensi/today/$userId"));
+      final response = await http.get(Uri.parse("${AppConfig.apiUrl}/presensi/today/$userId"));
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
         setState(() {
@@ -68,7 +70,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _fetchUserStats(String userId) async {
-    final response = await http.get(Uri.parse("http://192.168.229.178:8000/api/user-stats/$userId"));
+    final response = await http.get(Uri.parse("${AppConfig.apiUrl}/user-stats/$userId"));
     if (response.statusCode == 200) {
       setState(() {
         _userStats = jsonDecode(response.body)['data'];

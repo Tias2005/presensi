@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/theme.dart';
 import 'dashboard_page.dart';
 import 'face_register_page.dart';
+import '../config.dart';
+
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -30,7 +32,7 @@ class _LoginPageState extends State<LoginPage> {
     
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.229.178:8000/api/login-mobile'),
+        Uri.parse('${AppConfig.apiUrl}/login-mobile'),
         headers: {'Accept': 'application/json'},
         body: {
           'email': _emailController.text.trim(),

@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/theme.dart';
 import 'login_page.dart';
 import 'face_register_page.dart';
+import '../config.dart';
+
 
 class EditProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -44,7 +46,7 @@ Future<void> _updateProfile() async {
       final String? token = prefs.getString('token'); 
 
       final response = await http.post(
-        Uri.parse("http://192.168.229.178:8000/api/user/update/${widget.userData['id_user']}"),
+        Uri.parse("${AppConfig.apiUrl}/user/update/${widget.userData['id_user']}"),
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/x-www-form-urlencoded',
