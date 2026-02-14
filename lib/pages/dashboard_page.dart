@@ -7,8 +7,8 @@ import '../shared/theme.dart';
 import 'profile_page.dart';
 import 'calendar_page.dart'; 
 import 'form_pengajuan_page.dart';
+import 'presensi_page.dart'; 
 import '../config.dart';
-
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -56,32 +56,38 @@ class _DashboardPageState extends State<DashboardPage> {
       final response = await http.get(Uri.parse("${AppConfig.apiUrl}/presensi/today/$userId"));
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
-        setState(() {
-          _statusType = result['status'];
-          _displayMessage = result['message'] ?? "";
-          _todayPresence = result['data'];
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _statusType = result['status'];
+            _displayMessage = result['message'] ?? "";
+            _todayPresence = result['data'];
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
       debugPrint("Error fetch presensi: $e");
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _fetchUserStats(String userId) async {
     final response = await http.get(Uri.parse("${AppConfig.apiUrl}/user-stats/$userId"));
     if (response.statusCode == 200) {
-      setState(() {
-        _userStats = jsonDecode(response.body)['data'];
-      });
+      if (mounted) {
+        setState(() {
+          _userStats = jsonDecode(response.body)['data'];
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    bool hasCheckedIn = _todayPresence?['jam_masuk'] != null;
+
     final List<Widget> pages = [
-      _buildDashboardContent(),
+      _buildDashboardContent(hasCheckedIn),
       const Center(child: Text("Halaman Riwayat")),
       const ProfilePage(),
     ];
@@ -130,7 +136,7 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildDashboardContent() {
+  Widget _buildDashboardContent(bool hasCheckedIn) {
     String currentTime = DateFormat('HH.mm').format(DateTime.now());
     String currentDate = DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(DateTime.now());
 
@@ -193,13 +199,17 @@ class _DashboardPageState extends State<DashboardPage> {
                     "Check In",
                     _todayPresence?['jam_masuk'] ?? "-- : --",
                     _todayPresence?['lokasi'] ?? "-",
-                    _todayPresence?['jam_masuk'] != null),
+                    _todayPresence?['jam_masuk'] != null,
+                    true 
+                ),
                 const SizedBox(width: 15),
                 _buildStatusCard(
                     "Check Out",
                     _todayPresence?['jam_pulang'] ?? "-- : --",
                     _todayPresence?['lokasi'] ?? "-",
-                    _todayPresence?['jam_pulang'] != null),
+                    _todayPresence?['jam_pulang'] != null,
+                    hasCheckedIn 
+                ),
               ],
             )
           else
@@ -241,7 +251,6 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
 
           const SizedBox(height: 25),
-
           const Text("Ajukan Pengajuan",
               style: TextStyle(
                   fontWeight: FontWeight.bold,
@@ -300,7 +309,7 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildStatusCard(String title, String time, String location, bool isDone) {
+  Widget _buildStatusCard(String title, String time, String location, bool isDone, bool isEnabled) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(15),
@@ -323,13 +332,27 @@ class _DashboardPageState extends State<DashboardPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () { },
+                  onPressed: isEnabled ? () async {
+                    final result = await Navigator.push(
+                      context, 
+                      MaterialPageRoute(builder: (context) => const PresensiPage())
+                    );
+                    if (result == true) {
+                      _loadInitialData();
+                    }
+                  } : null, 
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: isEnabled ? AppColors.primary : Colors.grey[300],
                     padding: EdgeInsets.zero,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
                   ),
-                  child: const Text("Scan Sekarang", style: TextStyle(fontSize: 10, color: AppColors.white)),
+                  child: Text(
+                    "Scan Sekarang", 
+                    style: TextStyle(
+                      fontSize: 10, 
+                      color: isEnabled ? AppColors.white : Colors.grey[600]
+                    )
+                  ),
                 ),
               )
           ],
