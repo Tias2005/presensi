@@ -23,7 +23,9 @@ class PresensiPage extends StatefulWidget {
 
 class _PresensiPageState extends State<PresensiPage> {
   int _currentStep = 1;
+  bool _isCheckingStatus = true;
   bool _isLoading = false;
+  bool _isCheckOut = false;
 
   int? _selectedModeId;
   XFile? _capturedPhoto;
@@ -38,6 +40,7 @@ class _PresensiPageState extends State<PresensiPage> {
   void initState() {
     super.initState();
     _loadModelAndConfig();
+    _checkTodayStatus();
   }
 
   Future<void> _loadModelAndConfig() async {
@@ -52,20 +55,68 @@ class _PresensiPageState extends State<PresensiPage> {
     }
   }
 
+  Future<void> _checkTodayStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userDataStr = prefs.getString('user_data');
+
+    if (userDataStr == null) {
+      setState(() => _isCheckingStatus = false);
+      return;
+    }
+
+    final user = jsonDecode(userDataStr);
+
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiUrl}/presensi/today-status/${user['id_user']}'),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
+      if (data['data'] != null) {
+        _isCheckOut = true;
+        _selectedModeId = data['data']['id_kategori_kerja'];
+        _currentStep = 2;
+      }
+    }
+
+    if (mounted) {
+      setState(() => _isCheckingStatus = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isCheckingStatus || _configKantor == null || _interpreter == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_getStepTitle()),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: _handleBack),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _handleBack,
+        ),
       ),
       body: _buildCurrentStep(),
     );
   }
 
   String _getStepTitle() {
+    if (_isCheckOut) {
+      switch (_currentStep) {
+        case 2: return "Face Recognition";
+        case 3: return "Geolocation";
+        case 4: return "Verifikasi Akhir";
+        default: return "Presensi";
+      }
+    }
+
     switch (_currentStep) {
       case 1: return "Pilih Mode Kerja";
       case 2: return "Face Recognition";
@@ -172,32 +223,64 @@ class _PresensiPageState extends State<PresensiPage> {
     );
   }
 
+  Future<String> _getAddressFromLatLng(double lat, double lon) async {
+    final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse?lat=$lat&lon=$lon&format=json');
+
+    final response = await http.get(url, headers: {
+      'User-Agent': 'presensi-app'
+    });
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['display_name'] ?? "Alamat tidak ditemukan";
+    } else {
+      return "Alamat tidak ditemukan";
+    }
+  }
+
   Future<void> _submitPresensi() async {
     setState(() => _isLoading = true);
     try {
       final prefs = await SharedPreferences.getInstance();
       final userDataStr = prefs.getString('user_data');
-      if (userDataStr == null) return;
+      if (userDataStr == null) throw "Sesi user tidak ditemukan";
       final user = jsonDecode(userDataStr);
       
       var request = http.MultipartRequest('POST', Uri.parse('${AppConfig.apiUrl}/presensi/store'));
+      
+      request.headers['Accept'] = 'application/json';
+      
       request.fields['id_user'] = user['id_user'].toString();
-      request.fields['id_kategori_kerja'] = _selectedModeId.toString();
+      if (!_isCheckOut) {
+        request.fields['id_kategori_kerja'] = _selectedModeId.toString();
+      }
       request.fields['latitude'] = _currentPosition!.latitude.toString();
       request.fields['longitude'] = _currentPosition!.longitude.toString();
-      request.fields['lokasi'] = "Lokasi terverifikasi GPS";
+      String alamat = await _getAddressFromLatLng( _currentPosition!.latitude, _currentPosition!.longitude, );
+
+      request.fields['lokasi'] = alamat;
+
       
       request.files.add(await http.MultipartFile.fromPath('foto', _capturedPhoto!.path));
       
-      var res = await request.send();
-      if (res.statusCode == 200) {
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+      
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
         if (!mounted) return;
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Presensi Berhasil Dikirim!")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(responseData['message'] ?? "Presensi Berhasil!"), backgroundColor: Colors.green)
+        );
+      } else {
+        throw responseData['message'] ?? "Gagal menyimpan data (Error ${response.statusCode})";
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -258,8 +341,7 @@ class _StepFaceState extends State<_StepFace> {
       n1 += e1[i] * e1[i];
       n2 += e2[i] * e2[i];
     }
-    double similarity = dot / (math.sqrt(n1) * math.sqrt(n2));
-    return similarity;
+    return dot / (math.sqrt(n1) * math.sqrt(n2));
   }
 
   Future<void> _processCapture() async {
@@ -293,10 +375,10 @@ class _StepFaceState extends State<_StepFace> {
               .map((e) => double.parse(e.trim()))
               .toList();
         } else {
-          throw "Tipe data ${vectorData.runtimeType} tidak didukung.";
+          throw "Format data wajah (${vectorData.runtimeType}) tidak dikenal";
         }
       } catch (e) {
-        throw "Gagal memproses format data wajah: $e";
+        throw "Gagal membaca data wajah: $e";
       }
 
       final current = _extract(File(photo.path), faces.first);
@@ -305,7 +387,7 @@ class _StepFaceState extends State<_StepFace> {
       if (score > 0.70) { 
         widget.onResult(photo);
       } else {
-        throw "Wajah tidak cocok. Tingkat kemiripan: ${(score * 100).toStringAsFixed(1)}%";
+        throw "Verifikasi gagal. Skor kemiripan: ${(score * 100).toStringAsFixed(0)}%";
       }
     } catch (e) {
       if (!mounted) return;
