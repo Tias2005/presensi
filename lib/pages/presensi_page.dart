@@ -479,54 +479,77 @@ class _StepGeoState extends State<_StepGeo> {
   LatLng? _targetLocation;
 
   Future<void> _checkLocation() async {
-    setState(() => _loadingLocation = true);
-    try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) permission = await Geolocator.requestPermission();
+  setState(() => _loadingLocation = true);
+  try {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    
+    const LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.best, 
+      distanceFilter: 0, 
+    );
+
+    Position? finePosition;
+    
+    for (int i = 0; i < 3; i++) {
+      Position p = await Geolocator.getCurrentPosition(
+        locationSettings: locationSettings,
+      );
       
-  const LocationSettings locationSettings = LocationSettings(
-    accuracy: LocationAccuracy.high, 
-    distanceFilter: 10, 
-  );
-
-  Position p = await Geolocator.getCurrentPosition(
-    locationSettings: locationSettings,
-  );
-
-      double targetLat;
-      double targetLng;
-      double limit;
-
-      if (widget.modeId == 1) { // WFO
-        targetLat = double.parse(widget.config['latitude_kantor'].toString());
-        targetLng = double.parse(widget.config['longitude_kantor'].toString());
-        limit = double.parse(widget.config['radius_wfo'].toString());
-      } else { // WFH
-        final prefs = await SharedPreferences.getInstance();
-        final user = jsonDecode(prefs.getString('user_data') ?? '{}');
-        targetLat = double.parse(user['latitude_rumah']?.toString() ?? '0');
-        targetLng = double.parse(user['longitude_rumah']?.toString() ?? '0');
-        limit = double.parse(widget.config['radius_wfh'].toString());
+      finePosition = p;
+      
+      if (p.accuracy < 20) {
+        break;
       }
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
 
-      _targetLocation = LatLng(targetLat, targetLng);
-      double d = Geolocator.distanceBetween(p.latitude, p.longitude, targetLat, targetLng);
+    if (finePosition == null) throw "Tidak dapat mendapatkan sinyal GPS yang akurat.";
 
-      if (mounted) {
-        setState(() {
-          _pos = p;
-          _dist = d;
-          _isValid = widget.modeId == 3 ? true : (d <= limit);
-          _loadingLocation = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _loadingLocation = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Gagal mendapatkan lokasi: $e")));
-      }
+    double targetLat;
+    double targetLng;
+    double limit;
+
+    if (widget.modeId == 1) { // WFO
+      targetLat = double.parse(widget.config['latitude_kantor'].toString());
+      targetLng = double.parse(widget.config['longitude_kantor'].toString());
+      limit = double.parse(widget.config['radius_wfo'].toString());
+    } else { // WFH
+      final prefs = await SharedPreferences.getInstance();
+      final user = jsonDecode(prefs.getString('user_data') ?? '{}');
+      targetLat = double.parse(user['latitude_rumah']?.toString() ?? '0');
+      targetLng = double.parse(user['longitude_rumah']?.toString() ?? '0');
+      limit = double.parse(widget.config['radius_wfh'].toString());
+    }
+
+    _targetLocation = LatLng(targetLat, targetLng);
+    
+    double d = Geolocator.distanceBetween(
+      finePosition.latitude, 
+      finePosition.longitude, 
+      targetLat, 
+      targetLng
+    );
+
+    if (mounted) {
+      setState(() {
+        _pos = finePosition;
+        _dist = d;
+        _isValid = widget.modeId == 3 ? true : (d <= limit);
+        _loadingLocation = false;
+      });
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() => _loadingLocation = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Gagal mendapatkan lokasi: $e"))
+      );
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {

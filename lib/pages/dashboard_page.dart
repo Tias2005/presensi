@@ -9,6 +9,7 @@ import 'calendar_page.dart';
 import 'form_pengajuan_page.dart';
 import 'presensi_page.dart'; 
 import '../config.dart';
+import 'dart:async';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -23,11 +24,14 @@ class _DashboardPageState extends State<DashboardPage> {
   Map<String, dynamic>? _todayPresence;
   Map<String, dynamic>? _userStats;
   bool _isLoading = true;
+  Timer? _timer;
+  DateTime _now = DateTime.now();
 
   @override
   void initState() {
     super.initState();
     _loadInitialData();
+    _startClock();
   }
 
   Future<void> _loadInitialData() async {
@@ -46,6 +50,30 @@ class _DashboardPageState extends State<DashboardPage> {
         _fetchUserStats(userId),
       ]);
     }
+  }
+
+  void _startClock() {
+    _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _now = DateTime.now();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    await _loadInitialData();
   }
 
   String _displayMessage = "";
@@ -137,10 +165,10 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildDashboardContent(bool hasCheckedIn) {
-    String currentTime = DateFormat('HH.mm').format(DateTime.now());
-    String currentDate = DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(DateTime.now());
+  String currentTime = DateFormat('HH:mm').format(_now);
+  String currentDate = DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(_now);
 
-    return SingleChildScrollView(
+    return RefreshIndicator( onRefresh: _refreshData, color: AppColors.primary, child: SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -306,6 +334,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
         ],
       ),
+    ),
     );
   }
 
