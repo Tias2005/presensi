@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../shared/theme.dart';
+import 'notification_page.dart';
 import 'profile_page.dart';
 import 'calendar_page.dart'; 
 import 'form_pengajuan_page.dart';
@@ -19,6 +20,7 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
+  int _unreadCount = 0;
   int _currentIndex = 0;
   String _userName = "Memuat...";
   Map<String, dynamic>? _todayPresence;
@@ -32,6 +34,29 @@ class _DashboardPageState extends State<DashboardPage> {
     super.initState();
     _loadInitialData();
     _startClock();
+  }
+
+  Future<void> _openNotification() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userDataString = prefs.getString('user_data');
+
+    if (!mounted) return;
+
+    if (userDataString != null) {
+      final userData = jsonDecode(userDataString);
+      String userId = userData['id_user'].toString();
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => NotificationPage(userId: userId),
+        ),
+      );
+
+      if (mounted) {
+        _loadInitialData();
+      }
+    }
   }
 
   Future<void> _loadInitialData() async {
@@ -48,6 +73,7 @@ class _DashboardPageState extends State<DashboardPage> {
       await Future.wait([
         _fetchTodayPresence(userId),
         _fetchUserStats(userId),
+        _fetchUnreadCount(userId),
       ]);
     }
   }
@@ -110,6 +136,27 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  Future<void> _fetchUnreadCount(String userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse("${AppConfig.apiUrl}/notifications/$userId"),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body)['data'];
+        int count = data.where((n) => n['status_baca'] == 0).length;
+
+        if (mounted) {
+          setState(() {
+            _unreadCount = count;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetch unread: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     bool hasCheckedIn = _todayPresence?['jam_masuk'] != null;
@@ -135,13 +182,39 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             actions: [
               IconButton(
-                icon: const Badge(
-                  backgroundColor: Colors.red,
-                  label: Text("2"), 
-                  child: Icon(Icons.notifications_none, color: AppColors.primary)
+                icon: Stack(
+                  children: [
+                    const Icon(Icons.notifications_none, color: AppColors.primary),
+                    if (_unreadCount > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 18,
+                            minHeight: 18,
+                          ),
+                          child: Text(
+                            '$_unreadCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                  ],
                 ),
-                onPressed: () {},
+                onPressed: _openNotification,
               ),
+
               const SizedBox(width: 10),
             ],
           )
