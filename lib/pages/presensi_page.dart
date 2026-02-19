@@ -67,7 +67,7 @@ class _PresensiPageState extends State<PresensiPage> {
     final user = jsonDecode(userDataStr);
 
     final response = await http.get(
-      Uri.parse('${AppConfig.apiUrl}/presensi/today-status/${user['id_user']}'),
+      Uri.parse('${AppConfig.apiUrl}/presensi/today/${user['id_user']}'),
     );
 
     if (response.statusCode == 200) {

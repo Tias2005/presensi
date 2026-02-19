@@ -5,21 +5,38 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'pages/login_page.dart';
 import 'pages/dashboard_page.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'dart:developer' as dev;
 
 late List<CameraDescription> cameras;
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  await initializeDateFormatting('id_ID', null);
-  
-  cameras = await availableCameras();
-  
-  final prefs = await SharedPreferences.getInstance();
-  final String? token = prefs.getString('token');
+@pragma('vm:entry-point')
+  Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+    await Firebase.initializeApp();
+    dev.log("Menangani pesan background: ${message.messageId}", name: "FCM_BACK");
+  }
 
-  runApp(MyApp(isLoggedIn: token != null));
-}
+  Future<void> main() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    await Firebase.initializeApp();
+    
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    await initializeDateFormatting('id_ID', null);
+    
+    cameras = await availableCameras();
+    
+    final prefs = await SharedPreferences.getInstance();
+    final String? token = prefs.getString('token');
+
+    runApp(MyApp(isLoggedIn: token != null));
+  }
 
 class MyApp extends StatelessWidget {
   final bool isLoggedIn;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'dart:convert';
 import 'dart:developer' as dev;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -42,26 +43,40 @@ class _LoginPageState extends State<LoginPage> {
 
       final data = jsonDecode(response.body);
 
-      if (response.statusCode == 200) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', data['token']);
-        await prefs.setString('user_data', jsonEncode(data['user']));
+    if (response.statusCode == 200) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('token', data['token']);
+      await prefs.setString('user_data', jsonEncode(data['user']));
 
-        if (!mounted) return;
-        
-        final dynamic embedding = data['user']['embedding_vector'];
-        bool hasFaceData = embedding != null && 
-                           embedding.toString().isNotEmpty && 
-                           embedding.toString() != "null";
+      final fcmToken = await FirebaseMessaging.instance.getToken();
 
-        if (!hasFaceData) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const FaceRegisterPage()));
-        } else {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const DashboardPage()));
+      await http.post(
+        Uri.parse('${AppConfig.apiUrl}/save-fcm-token'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer ${data['token']}',
+        },
+        body: {
+          'id_user': data['user']['id_user'],
+          'fcm_token': fcmToken ?? '',
+        },
+      );
+
+      if (!mounted) return;
+
+      final dynamic embedding = data['user']['embedding_vector'];
+      bool hasFaceData = embedding != null &&
+          embedding.toString().isNotEmpty &&
+          embedding.toString() != "null";
+
+      if (!hasFaceData) {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const FaceRegisterPage()));
+      } else {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const DashboardPage()));
         }
       } else {
         throw data['message'] ?? 'Gagal Terhubung ke Server';
-      }
+      } 
     } catch (e) {
       dev.log("Login Error: $e", name: "AUTH");
       ScaffoldMessenger.of(context).showSnackBar(

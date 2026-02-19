@@ -11,6 +11,8 @@ import 'form_pengajuan_page.dart';
 import 'presensi_page.dart'; 
 import '../config.dart';
 import 'dart:async';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -32,8 +34,10 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    _requestNotificationPermission();
     _loadInitialData();
     _startClock();
+    _initForegroundFetch();
   }
 
   Future<void> _openNotification() async {
@@ -78,12 +82,35 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  Future<void> _requestNotificationPermission() async {
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      debugPrint('User granted permission');
+    }
+  }
+
   void _startClock() {
     _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
       if (mounted) {
         setState(() {
           _now = DateTime.now();
         });
+      }
+    });
+  }
+
+  void _initForegroundFetch() {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint("Notifikasi diterima di foreground: ${message.notification?.title}");
+      
+      if (mounted) {
+        _loadInitialData();
       }
     });
   }
@@ -138,19 +165,28 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _fetchUnreadCount(String userId) async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
       final response = await http.get(
-        Uri.parse("${AppConfig.apiUrl}/notifications/$userId"),
+        Uri.parse("${AppConfig.apiUrl}/notifications/unread-count/$userId"),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body)['data'];
-        int count = data.where((n) => n['status_baca'] == 0).length;
+        final data = jsonDecode(response.body);
+        int count = data['unread_count'] ?? 0;
 
         if (mounted) {
           setState(() {
             _unreadCount = count;
           });
         }
+      } else {
+        debugPrint("Gagal ambil count: ${response.statusCode}");
       }
     } catch (e) {
       debugPrint("Error fetch unread: $e");
