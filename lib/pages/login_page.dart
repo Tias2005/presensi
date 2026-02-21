@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/theme.dart';
 import 'dashboard_page.dart';
 import 'face_register_page.dart';
+import 'forgot_password_page.dart';
 import '../config.dart';
 
 
@@ -112,7 +113,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 20),
                     const Text(
-                      "MONITORING PRESENSI", 
+                      "APLIKASI PRESENSI", 
                       style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 1.5)
                     ),
                     const Text(
@@ -167,6 +168,18 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 40),
+
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => const ForgotPasswordPage()));
+                      },
+                      child: const Text("Lupa Password? Reset di sini", style: TextStyle(color: AppColors.primary)),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
                   
                   SizedBox(
                     width: double.infinity,
