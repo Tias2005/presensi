@@ -25,6 +25,84 @@ class _NotificationPageState extends State<NotificationPage> {
     _fetchNotifications();
   }
 
+  void _showNotifDetail(Map<String, dynamic> notif) {
+    if (notif['status_baca'] == 0) {
+      _markAsRead(notif['id_notifikasi']);
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              Text(
+                notif['judul'] ?? "Detail Notifikasi",
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                DateFormat('dd MMMM yyyy, HH:mm').format(DateTime.parse(notif['created_at'])),
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+              const Divider(height: 32),
+              
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: Text(
+                  notif['pesan'],
+                  style: const TextStyle(fontSize: 15, height: 1.5, color: Colors.black87),
+                ),
+              ),
+              
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Tutup", style: TextStyle(color: Colors.white)),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _fetchNotifications() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -39,12 +117,13 @@ class _NotificationPageState extends State<NotificationPage> {
       );
 
       if (response.statusCode == 200) {
-        setState(() {
-          _notifications = jsonDecode(response.body)['data'];
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _notifications = jsonDecode(response.body)['data'];
+            _isLoading = false;
+          });
+        }
       } else {
-        dev.log("Error: ${response.body}");
         setState(() => _isLoading = false);
       }
     } catch (e) {
@@ -52,7 +131,6 @@ class _NotificationPageState extends State<NotificationPage> {
       setState(() => _isLoading = false);
     }
   }
-
 
   Future<void> _markAsRead(int id) async {
     final prefs = await SharedPreferences.getInstance();
@@ -65,16 +143,14 @@ class _NotificationPageState extends State<NotificationPage> {
         'Authorization': 'Bearer $token',
       },
     );
-
     _fetchNotifications();
   }
-
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Notifikasi", style: TextStyle(color: AppColors.primary)),
+        title: const Text("Notifikasi", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         iconTheme: const IconThemeData(color: AppColors.primary),
         elevation: 0.5,
@@ -90,7 +166,7 @@ class _NotificationPageState extends State<NotificationPage> {
                     separatorBuilder: (context, index) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final notif = _notifications[index];
-                      bool isUnread = notif['status_baca'] == 0;
+                      bool isUnread = notif['status_baca'] == 0;           
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         tileColor: isUnread 
@@ -98,35 +174,36 @@ class _NotificationPageState extends State<NotificationPage> {
                             : Colors.white,
                         leading: CircleAvatar(
                           radius: 22,
-                          backgroundColor: isUnread 
-                              ? AppColors.primary 
-                              : Colors.grey[400],
-                          child: const Icon(
-                            Icons.notifications,
-                            color: Colors.white,
+                          backgroundColor: isUnread ? AppColors.primary : Colors.grey[300],
+                          child: Icon(
+                            isUnread ? Icons.notifications_active : Icons.notifications_none,
+                            color: isUnread ? Colors.white : Colors.grey[600],
                             size: 20,
                           ),
                         ),
                         title: Text(
-                          notif['pesan'],
+                          notif['judul'] ?? "Info Presensi", 
                           style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: isUnread 
-                                ? FontWeight.bold 
-                                : FontWeight.normal,
+                            fontSize: 15,
+                            fontWeight: isUnread ? FontWeight.bold : FontWeight.w500,
+                            color: isUnread ? Colors.black : Colors.grey[700],
                           ),
                         ),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            DateFormat('dd MMM yyyy, HH:mm')
-                                .format(DateTime.parse(notif['created_at'])),
-                            style: const TextStyle(fontSize: 12),
-                          ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            Text(
+                              DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(notif['created_at'])),
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ],
                         ),
-                        onTap: () => _markAsRead(notif['id_notifikasi']),
+                        trailing: isUnread 
+                          ? Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle))
+                          : null,
+                        onTap: () => _showNotifDetail(notif), 
                       );
-
                     },
                   ),
                 ),
