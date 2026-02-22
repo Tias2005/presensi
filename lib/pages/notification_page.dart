@@ -146,6 +146,50 @@ class _NotificationPageState extends State<NotificationPage> {
     _fetchNotifications();
   }
 
+  Future<void> _deleteNotification(int id) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    final response = await http.delete(
+      Uri.parse("${AppConfig.apiUrl}/notifications/$id"),
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      _fetchNotifications();
+    }
+  }
+
+  void _confirmDelete(Map<String, dynamic> notif) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Hapus Notifikasi"),
+        content: const Text("Apakah kamu yakin ingin menghapus notifikasi ini?"),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Batal"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteNotification(notif['id_notifikasi']);
+            },
+            child: const Text("Iya", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -203,6 +247,7 @@ class _NotificationPageState extends State<NotificationPage> {
                           ? Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle))
                           : null,
                         onTap: () => _showNotifDetail(notif), 
+                        onLongPress: () => _confirmDelete(notif),
                       );
                     },
                   ),

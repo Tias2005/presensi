@@ -9,6 +9,7 @@ import 'profile_page.dart';
 import 'calendar_page.dart'; 
 import 'form_pengajuan_page.dart';
 import 'presensi_page.dart'; 
+import 'riwayat_page.dart';
 import '../config.dart';
 import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -27,6 +28,10 @@ class _DashboardPageState extends State<DashboardPage> {
   String _userName = "Memuat...";
   Map<String, dynamic>? _todayPresence;
   Map<String, dynamic>? _userStats;
+  Map<String, dynamic>? _jamKerja;
+  Map<String, dynamic>? _jatahCuti;
+  Map<String, dynamic>? _lokasiSetting;
+  List<dynamic> _hariKerja = [];
   bool _isLoading = true;
   Timer? _timer;
   DateTime _now = DateTime.now();
@@ -78,6 +83,7 @@ class _DashboardPageState extends State<DashboardPage> {
         _fetchTodayPresence(userId),
         _fetchUserStats(userId),
         _fetchUnreadCount(userId),
+        _fetchJadwalInfo(),
       ]);
     }
   }
@@ -193,13 +199,35 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  Future<void> _fetchJadwalInfo() async {
+    try {
+      final responses = await Future.wait([
+        http.get(Uri.parse("${AppConfig.apiUrl}/jam-kerja")),
+        http.get(Uri.parse("${AppConfig.apiUrl}/hari-kerja")),
+        http.get(Uri.parse("${AppConfig.apiUrl}/jatah-cuti/global")),
+        http.get(Uri.parse("${AppConfig.apiUrl}/lokasi-presensi")),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _jamKerja = jsonDecode(responses[0].body);
+          _hariKerja = jsonDecode(responses[1].body);
+          _jatahCuti = jsonDecode(responses[2].body)['data'];
+          _lokasiSetting = jsonDecode(responses[3].body)['data'];
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetch jadwal: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     bool hasCheckedIn = _todayPresence?['jam_masuk'] != null;
 
-    final List<Widget> pages = [
+  final List<Widget> pages = [
       _buildDashboardContent(hasCheckedIn),
-      const Center(child: Text("Halaman Riwayat")),
+      const RiwayatPage(),
       const ProfilePage(),
     ];
 
@@ -414,8 +442,29 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ),
 
+          if (_userStats != null) ...[
+            const SizedBox(height: 25),
+            const Text("Statistik Saya",
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: AppColors.primary)),
+            const SizedBox(height: 15),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                  color: AppColors.white, borderRadius: BorderRadius.circular(15)),
+              child: Column(
+                children: [
+                  _buildStatRow("Total Kehadiran", "${_userStats?['total_hadir'] ?? 0} Hari"),
+                  _buildStatRow("Total Terlambat", "${_userStats?['total_terlambat'] ?? 0} Kali"),
+                ],
+              ),
+            ),
+          ],
+
           const SizedBox(height: 25),
-          const Text("Statistik Bulan Ini",
+          const Text("Informasi Penjadwalan",
               style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
@@ -424,22 +473,37 @@ class _DashboardPageState extends State<DashboardPage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-            color: AppColors.white, borderRadius: BorderRadius.circular(15)),
+                color: AppColors.white, borderRadius: BorderRadius.circular(15)),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildStatRow("Hadir", _userStats?['hadir'] ?? "0 hari"),
-                const Divider(height: 20),
-                _buildStatRow("Terlambat", _userStats?['terlambat'] ?? "0 kali"),
-                const Divider(height: 20),
-                _buildStatRow("Izin", _userStats?['izin'] ?? "0 hari"),
-                const Divider(height: 20),
-                _buildStatRow("Cuti", _userStats?['cuti'] ?? "0 hari"),
-                const Divider(height: 20),
-                _buildStatRow("Lembur", _userStats?['lembur'] ?? "0 jam"),
+                _buildInfoSection("Kebijakan Cuti", [
+                  _buildStatRow("Jatah Cuti Tahunan", "${_jatahCuti?['jatah_tahunan_global'] ?? 0} Hari"),
+                ]),
+                const Divider(height: 30),
+                _buildInfoSection("Pengaturan Jam Kerja", [
+                  _buildStatRow("Jam Masuk Utama", _jamKerja?['jam_masuk'] ?? "--:--"),
+                  _buildStatRow("Jam Pulang Utama", _jamKerja?['jam_pulang'] ?? "--:--"),
+                  _buildStatRow("Mulai Absen Masuk", _jamKerja?['mulai_absen_masuk'] ?? "--:--"),
+                  _buildStatRow("Batas Akhir Masuk", _jamKerja?['batas_akhir_masuk'] ?? "--:--"),
+                  _buildStatRow("Mulai Absen Pulang", _jamKerja?['mulai_absen_pulang'] ?? "--:--"),
+                  _buildStatRow("Batas Akhir Pulang", _jamKerja?['batas_akhir_pulang'] ?? "--:--"),
+                ]),
+                const Divider(height: 30),
+                _buildInfoSection("Hari Kerja", [
+                _buildStatRow("Status", "${_hariKerja.where((h) => h['is_hari_kerja'] == 1).length} Hari/Minggu"),                  _buildStatRow("Hari", _hariKerja.where((h) => h['is_hari_kerja'] == 1).map((h) {
+                    List<String> namaHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+                    return namaHari[h['hari_ke']];
+                  }).join(", ")),
+                ]),
+                const Divider(height: 30),
+                _buildInfoSection("Radius Presensi", [
+                  _buildStatRow("Radius WFO", "${_lokasiSetting?['radius_wfo'] ?? 0} Meter"),
+                  _buildStatRow("Radius WFH", "${_lokasiSetting?['radius_wfh'] ?? 0} Meter"),
+                ]),
               ],
             ),
           ),
-          const SizedBox(height: 20),
 
         ],
       ),
@@ -516,13 +580,34 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildStatRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildInfoSection(String title, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: AppColors.grey, fontSize: 14)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 14)),
+        Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+        const SizedBox(height: 10),
+        ...children,
       ],
+    );
+  }
+
+  Widget _buildStatRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(color: AppColors.grey, fontSize: 13)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(value, 
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87, fontSize: 13)
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
