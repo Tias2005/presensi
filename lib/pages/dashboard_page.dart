@@ -458,6 +458,9 @@ class _DashboardPageState extends State<DashboardPage> {
                 children: [
                   _buildStatRow("Total Kehadiran", "${_userStats?['total_hadir'] ?? 0} Hari"),
                   _buildStatRow("Total Terlambat", "${_userStats?['total_terlambat'] ?? 0} Kali"),
+                  _buildStatRow("Total Izin", "${_userStats?['total_izin'] ?? 0} Hari"),
+                  _buildStatRow("Total Cuti", "${_userStats?['total_cuti'] ?? 0} Hari"),
+                  _buildStatRow("Total Lembur", "${_userStats?['total_lembur'] ?? 0} Jam"),
                 ],
               ),
             ),
@@ -482,19 +485,17 @@ class _DashboardPageState extends State<DashboardPage> {
                 ]),
                 const Divider(height: 30),
                 _buildInfoSection("Pengaturan Jam Kerja", [
-                  _buildStatRow("Jam Masuk Utama", _jamKerja?['jam_masuk'] ?? "--:--"),
-                  _buildStatRow("Jam Pulang Utama", _jamKerja?['jam_pulang'] ?? "--:--"),
-                  _buildStatRow("Mulai Absen Masuk", _jamKerja?['mulai_absen_masuk'] ?? "--:--"),
-                  _buildStatRow("Batas Akhir Masuk", _jamKerja?['batas_akhir_masuk'] ?? "--:--"),
-                  _buildStatRow("Mulai Absen Pulang", _jamKerja?['mulai_absen_pulang'] ?? "--:--"),
-                  _buildStatRow("Batas Akhir Pulang", _jamKerja?['batas_akhir_pulang'] ?? "--:--"),
+                  _buildStatRow("Jam Masuk Utama", (_jamKerja?['jam_masuk'] ?? "--:--").substring(0,5)),
+                  _buildStatRow("Jam Pulang Utama", (_jamKerja?['jam_pulang'] ?? "--:--").substring(0,5)),
+                  _buildStatRow("Mulai Absen Masuk", (_jamKerja?['mulai_absen_masuk'] ?? "--:--").substring(0,5)),
+                  _buildStatRow("Batas Akhir Masuk", (_jamKerja?['akhir_absen_masuk'] ?? "--:--").substring(0,5)),
+                  _buildStatRow("Mulai Absen Pulang", (_jamKerja?['mulai_absen_pulang'] ?? "--:--").substring(0,5)),
+                  _buildStatRow("Batas Akhir Pulang", (_jamKerja?['akhir_absen_pulang'] ?? "--:--").substring(0,5)),
                 ]),
                 const Divider(height: 30),
                 _buildInfoSection("Hari Kerja", [
-                _buildStatRow("Status", "${_hariKerja.where((h) => h['is_hari_kerja'] == 1).length} Hari/Minggu"),                  _buildStatRow("Hari", _hariKerja.where((h) => h['is_hari_kerja'] == 1).map((h) {
-                    List<String> namaHari = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-                    return namaHari[h['hari_ke']];
-                  }).join(", ")),
+                _buildStatRow("Status", "${_hariKerja.where((h) => h['is_hari_kerja'] == 1).length} Hari/Minggu"),                  
+                _buildStatRow("Hari",_hariKerja.where((h) => h['is_hari_kerja'] == 1).map((h) => h['nama_hari']).join(", ")),
                 ]),
                 const Divider(height: 30),
                 _buildInfoSection("Radius Presensi", [

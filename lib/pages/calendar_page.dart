@@ -66,28 +66,37 @@ class _CalendarPageState extends State<CalendarPage> {
 
   DateTime _normalizeDate(DateTime date) => DateTime(date.year, date.month, date.day);
 
-  @override
+@override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text("Kalender & Hari Libur", 
-          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: Colors.white,
-        elevation: 0.5,
+        title: const Text(
+          "Kalender & Hari Libur", 
+          style: TextStyle(
+            color: Colors.white, 
+            fontWeight: FontWeight.bold, 
+            fontSize: 18
+          )
+        ),
+        backgroundColor: AppColors.primary,
+        elevation: 0, 
+        centerTitle: false,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : Column(
-            children: [
-              _buildCalendarCard(),
-              _buildLegendSection(),
-              if (_selectedDay != null) _buildSelectedDayDetail(),
-            ],
+        ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+        : SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildCalendarCard(),
+                _buildLegendSection(),
+                if (_selectedDay != null) _buildSelectedDayDetail(),
+              ],
+            ),
           ),
     );
   }
@@ -96,8 +105,15 @@ class _CalendarPageState extends State<CalendarPage> {
     return Container(
       margin: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(15),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
+        color: Colors.white, 
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05), 
+            blurRadius: 10,
+            offset: const Offset(0, 4)
+          )
+        ],
       ),
       child: TableCalendar(
         locale: 'id_ID',
@@ -105,7 +121,17 @@ class _CalendarPageState extends State<CalendarPage> {
         lastDay: DateTime.utc(2030, 12, 31),
         focusedDay: _focusedDay,
         selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-        headerStyle: const HeaderStyle(formatButtonVisible: false, titleCentered: true),
+        headerStyle: const HeaderStyle(
+          formatButtonVisible: false, 
+          titleCentered: true,
+          titleTextStyle: TextStyle(
+            fontWeight: FontWeight.bold, 
+            fontSize: 16, 
+            color: AppColors.primary
+          ),
+          leftChevronIcon: Icon(Icons.chevron_left, color: AppColors.primary),
+          rightChevronIcon: Icon(Icons.chevron_right, color: AppColors.primary),
+        ),
         onDaySelected: (selectedDay, focusedDay) {
           setState(() {
             _selectedDay = selectedDay;
@@ -116,9 +142,13 @@ class _CalendarPageState extends State<CalendarPage> {
           _focusedDay = focusedDay;
           _fetchCalendarData();
         },
-        calendarStyle: const CalendarStyle(
-          selectedDecoration: BoxDecoration(color: Colors.blue, shape: BoxShape.circle),
-          todayDecoration: BoxDecoration(color: Color.fromARGB(255, 201, 208, 215), shape: BoxShape.circle),
+        calendarStyle: CalendarStyle(
+          selectedDecoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+          todayDecoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.2), 
+            shape: BoxShape.circle
+          ),
+          todayTextStyle: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
         ),
         calendarBuilders: CalendarBuilders(
           defaultBuilder: (context, day, focusedDay) {

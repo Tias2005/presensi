@@ -180,11 +180,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text("Edit Profil"),
-        foregroundColor: AppColors.primary,
-        backgroundColor: Colors.white,
-        elevation: 0.5,
+        title: const Text(
+          "Edit Profil",
+          style: TextStyle(
+            color: Colors.white, 
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        backgroundColor: AppColors.primary, 
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white), 
+        centerTitle: false,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -193,17 +202,41 @@ class _EditProfilePageState extends State<EditProfilePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Data Umum", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary)),
-              const SizedBox(height: 15),
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    "Data Umum", 
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold, 
+                      fontSize: 16, 
+                      color: AppColors.primary
+                    )
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              
               _buildTextField("Nama Lengkap", _namaController, Icons.person_outline),
               _buildTextField("Email", _emailController, Icons.email_outlined),
               _buildTextField("No. Telepon", _phoneController, Icons.phone_android_outlined),
               _buildTextField("Alamat", _alamatController, Icons.location_on_outlined, maxLines: 2),
 
               const SizedBox(height: 10),
-              const Text("Titik Lokasi Rumah", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary)),
-              const SizedBox(height: 10),
-              
+              const Text(
+                "Titik Lokasi Rumah", 
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary)
+              ),
+              const SizedBox(height: 12),
+
               _buildMapSection(),
               
               const SizedBox(height: 10),

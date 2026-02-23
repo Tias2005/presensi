@@ -236,41 +236,72 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text("Form ${widget.tipe}", style: const TextStyle(color: AppColors.primary, fontSize: 18)),
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        iconTheme: const IconThemeData(color: AppColors.primary),
+        title: Text(
+          "Form ${widget.tipe}", 
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white, 
+            fontSize: 18,
+          )
+        ),
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        centerTitle: false,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Text(
-                "Detail ${widget.tipe}", 
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24, color: AppColors.primary)
-              ),
+            Row(
+              children: [
+                Container(
+                  width: 5,
+                  height: 25,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  "Detail ${widget.tipe}", 
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold, 
+                    fontSize: 20, 
+                    color: Colors.black87
+                  )
+                ),
+              ],
             ),
             
             if (widget.tipe == "Cuti") ...[
-              const SizedBox(height: 10),
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    "Sisa Jatah Cuti: ${_sisaCuti ?? '-'} Hari",
-                    style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.primary),
-                  ),
+              const SizedBox(height: 15),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline, color: AppColors.primary, size: 20),
+                    const SizedBox(width: 10),
+                    Text(
+                      "Sisa Jatah Cuti: ${_sisaCuti ?? '-'} Hari",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold, 
+                        color: AppColors.primary
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 25),
             
             _buildDatePicker(
               label: widget.tipe == "Lembur" ? "Tanggal Lembur" : "Tanggal Mulai",

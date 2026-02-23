@@ -56,12 +56,16 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text("Profil Saya", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        elevation: 0.5,
+        title: const Text(
+          "Profil Saya", 
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+        ),
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        centerTitle: false,
         actions: [
           PopupMenuButton<String>(
-            icon: const Icon(Icons.settings, color: AppColors.primary),
+            icon: const Icon(Icons.settings, color: Colors.white), 
             offset: const Offset(0, 50),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             onSelected: (value) async {
@@ -105,9 +109,9 @@ class _ProfilePageState extends State<ProfilePage> {
           children: [
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 30),
+              padding: const EdgeInsets.only(bottom: 30, top: 10),
               decoration: const BoxDecoration(
-                color: Colors.white,
+                color: AppColors.primary,
                 borderRadius: BorderRadius.only(
                   bottomLeft: Radius.circular(30),
                   bottomRight: Radius.circular(30),
@@ -115,38 +119,50 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 65,
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                    child: ClipOval(
-                      child: _userData!['foto_profil'] != null
-                          ? Image.network(
-                              "$_baseUrl${_userData!['foto_profil']}",
-                              width: 120,
-                              height: 120,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Icon(Icons.person, size: 70, color: AppColors.primary);
-                              },
-                            )
-                          : const Icon(Icons.person, size: 70, color: AppColors.primary),
-                    ),
+                  Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 4),
+                        ),
+                        child: CircleAvatar(
+                          radius: 60,
+                          backgroundColor: Colors.white.withValues(alpha: 0.2),
+                          child: ClipOval(
+                            child: _userData!['foto_profil'] != null
+                                ? Image.network(
+                                    "$_baseUrl${_userData!['foto_profil']}",
+                                    width: 120,
+                                    height: 120,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Icon(Icons.person, size: 70, color: Colors.white);
+                                    },
+                                  )
+                                : const Icon(Icons.person, size: 70, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 15),
                   Text(
                     _userData!['nama_user'] ?? "-",
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primary),
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
+                  const SizedBox(height: 5),
                   Text(
                     _userData!['jabatan'] ?? "Karyawan",
-                    style: const TextStyle(color: Colors.grey, letterSpacing: 1.1),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.8), letterSpacing: 1.1),
                   ),
                 ],
               ),
             ),
             
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
               child: Column(
                 children: [
                   _buildProfileItem("Divisi", _userData!['divisi']?.toString() ?? "-", Icons.business_center_outlined),
@@ -154,7 +170,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   _buildProfileItem("Email", _userData!['email_user']?.toString() ?? "-", Icons.email_outlined),
                   _buildProfileItem("Telepon", _userData!['no_telepon']?.toString() ?? "-", Icons.phone_android_outlined),
                   _buildProfileItem("Alamat", _userData!['alamat']?.toString() ?? "-", Icons.location_on_outlined),
-                  _buildProfileItem("Status Akun", _userData!['status_user']?.toString() ?? "-", Icons.info_outline),
                 ],
               ),
             ),

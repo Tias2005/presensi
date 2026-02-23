@@ -193,35 +193,55 @@ class _NotificationPageState extends State<NotificationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background, 
       appBar: AppBar(
-        title: const Text("Notifikasi", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: AppColors.primary),
-        elevation: 0.5,
+        title: const Text(
+          "Notifikasi", 
+          style: TextStyle(
+            color: Colors.white, 
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          )
+        ),
+        backgroundColor: AppColors.primary, 
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white), 
+        centerTitle: false,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
           : _notifications.isEmpty
-              ? const Center(child: Text("Tidak ada notifikasi"))
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.notifications_off_outlined, size: 60, color: Colors.grey[400]),
+                      const SizedBox(height: 10),
+                      Text("Tidak ada notifikasi", style: TextStyle(color: Colors.grey[600])),
+                    ],
+                  ),
+                )
               : RefreshIndicator(
+                  color: AppColors.primary,
                   onRefresh: _fetchNotifications,
                   child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 10), 
                     itemCount: _notifications.length,
-                    separatorBuilder: (context, index) => const Divider(height: 1),
+                    separatorBuilder: (context, index) => const SizedBox(height: 2), 
                     itemBuilder: (context, index) {
                       final notif = _notifications[index];
                       bool isUnread = notif['status_baca'] == 0;           
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         tileColor: isUnread 
-                            ? AppColors.primary.withValues(alpha: 0.05) 
+                            ? AppColors.primary.withValues(alpha: 0.08) 
                             : Colors.white,
                         leading: CircleAvatar(
                           radius: 22,
-                          backgroundColor: isUnread ? AppColors.primary : Colors.grey[300],
+                          backgroundColor: isUnread ? AppColors.primary : Colors.grey[200],
                           child: Icon(
                             isUnread ? Icons.notifications_active : Icons.notifications_none,
-                            color: isUnread ? Colors.white : Colors.grey[600],
+                            color: isUnread ? Colors.white : Colors.grey[500],
                             size: 20,
                           ),
                         ),
@@ -230,7 +250,7 @@ class _NotificationPageState extends State<NotificationPage> {
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: isUnread ? FontWeight.bold : FontWeight.w500,
-                            color: isUnread ? Colors.black : Colors.grey[700],
+                            color: isUnread ? Colors.black87 : Colors.grey[700],
                           ),
                         ),
                         subtitle: Column(
@@ -239,12 +259,16 @@ class _NotificationPageState extends State<NotificationPage> {
                             const SizedBox(height: 4),
                             Text(
                               DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(notif['created_at'])),
-                              style: const TextStyle(fontSize: 12),
+                              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                             ),
                           ],
                         ),
                         trailing: isUnread 
-                          ? Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle))
+                          ? Container(
+                              width: 8, 
+                              height: 8, 
+                              decoration: const BoxDecoration(color: Colors.orange, shape: BoxShape.circle) 
+                            )
                           : null,
                         onTap: () => _showNotifDetail(notif), 
                         onLongPress: () => _confirmDelete(notif),
