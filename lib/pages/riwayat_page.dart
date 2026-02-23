@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/theme.dart';
 import '../config.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 
 class RiwayatPage extends StatefulWidget {
   const RiwayatPage({super.key});
@@ -24,6 +25,11 @@ class _RiwayatPageState extends State<RiwayatPage> {
     super.initState();
     _fetchRiwayat();
   }
+
+  List<String> namaBulan = [
+    "Januari","Februari","Maret","April","Mei","Juni",
+    "Juli","Agustus","September","Oktober","November","Desember"
+  ];
 
   Future<void> _fetchRiwayat() async {
     setState(() => _isLoading = true);
@@ -51,47 +57,56 @@ class _RiwayatPageState extends State<RiwayatPage> {
   Future<void> _exportExcel() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-    final url = Uri.parse('${AppConfig.apiUrl}/export-riwayat-user?bulan=$_selectedBulan&token=$token');
-    
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    }
+    final url = Uri.parse(
+      '${AppConfig.apiUrl}/export-riwayat-mobile?bulan=$_selectedBulan&token=$token',
+    );
+    await launchUrl(
+      url,
+      mode: LaunchMode.externalApplication,
+      webViewConfiguration: WebViewConfiguration(
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 120,
-            pinned: true,
-            backgroundColor: AppColors.primary,
-            flexibleSpace: const FlexibleSpaceBar(
-              title: Text("Riwayat Presensi", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              centerTitle: false,
+      appBar: AppBar(
+        title: const Text(
+          "Riwayat Presensi",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
+      ),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : RefreshIndicator(
+            onRefresh: _fetchRiwayat,
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _buildRingkasanCard(),
+                const SizedBox(height: 20),
+                _buildFilterAndExport(),
+                const SizedBox(height: 15),
+                const Text(
+                  "Daftar Riwayat",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold, 
+                    fontSize: 16,
+                    color: AppColors.primary
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _buildListRiwayat(),
+              ],
             ),
           ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildRingkasanCard(),
-                  const SizedBox(height: 20),
-                  _buildFilterAndExport(),
-                  const SizedBox(height: 10),
-                  _isLoading 
-                    ? const Center(child: CircularProgressIndicator())
-                    : _buildListRiwayat(),
-                ],
-              ),
-            ),
-          )
-        ],
-      ),
     );
   }
 
@@ -100,14 +115,26 @@ class _RiwayatPageState extends State<RiwayatPage> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05), 
+            blurRadius: 10,
+            offset: const Offset(0, 4)
+          )
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Ringkasan Bulan Ini", 
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Row(
+            children: [
+              Icon(Icons.analytics_outlined, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+              const Text("Ringkasan Bulan Ini", 
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
           const SizedBox(height: 15),
           GridView.count(
             shrinkWrap: true,
@@ -115,16 +142,16 @@ class _RiwayatPageState extends State<RiwayatPage> {
             crossAxisCount: 2, 
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            childAspectRatio: 2.8,
+            childAspectRatio: 2.5,
             children: [
-              _itemRingkasan("Hadir", "${_ringkasan['hadir'] ?? 0}", Colors.green),
-              _itemRingkasan("Terlambat", "${_ringkasan['terlambat'] ?? 0}", Colors.orange),
-              _itemRingkasan("Izin", "${_ringkasan['izin'] ?? 0}", Colors.lightBlue),
-              _itemRingkasan("Cuti", "${_ringkasan['cuti'] ?? 0}", Colors.redAccent),
+              _itemRingkasan("Hadir", "${_ringkasan['hadir'] ?? 0} Hari", Colors.green),
+              _itemRingkasan("Terlambat", "${_ringkasan['terlambat'] ?? 0} Hari", Colors.orange),
+              _itemRingkasan("Izin", "${_ringkasan['izin'] ?? 0} Hari", Colors.lightBlue),
+              _itemRingkasan("Cuti", "${_ringkasan['cuti'] ?? 0} Hari", Colors.redAccent),
               _itemRingkasan("Lembur", "${_ringkasan['lembur'] ?? 0} Jam", Colors.purple),
-              _itemRingkasan("WFO", "${_ringkasan['wfo'] ?? 0}", Colors.teal),
-              _itemRingkasan("WFH", "${_ringkasan['wfh'] ?? 0}", Colors.indigo),
-              _itemRingkasan("WFA", "${_ringkasan['wfa'] ?? 0}", Colors.cyan),
+              _itemRingkasan("WFO", "${_ringkasan['wfo'] ?? 0} Kali", Colors.teal),
+              _itemRingkasan("WFH", "${_ringkasan['wfh'] ?? 0} Kali", Colors.indigo),
+              _itemRingkasan("WFA", "${_ringkasan['wfa'] ?? 0} Kali", Colors.cyan),
             ],
           )
         ],
@@ -153,13 +180,18 @@ class _RiwayatPageState extends State<RiwayatPage> {
         Expanded(
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(
+              color: Colors.white, 
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300)
+            ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: _selectedBulan,
+                isExpanded: true,
                 items: List.generate(12, (index) {
                   String val = (index + 1).toString().padLeft(2, '0');
-                  return DropdownMenuItem(value: val, child: Text("Bulan $val"));
+                  return DropdownMenuItem(value: val, child: Text(namaBulan[index]));
                 }),
                 onChanged: (v) {
                   setState(() => _selectedBulan = v!);
@@ -170,14 +202,21 @@ class _RiwayatPageState extends State<RiwayatPage> {
           ),
         ),
         const SizedBox(width: 10),
-        ElevatedButton.icon(
-          onPressed: _exportExcel,
-          icon: const Icon(Icons.download, size: 18),
-          label: const Text("Export"),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppColors.primary)),
+        SizedBox(
+          height: 48,
+          child: ElevatedButton.icon(
+            onPressed: _exportExcel,
+            icon: const Icon(Icons.file_download_outlined, size: 20),
+            label: const Text("Export"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.primary,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12), 
+                side: const BorderSide(color: AppColors.primary)
+              ),
+            ),
           ),
         )
       ],
@@ -193,13 +232,22 @@ class _RiwayatPageState extends State<RiwayatPage> {
       itemCount: _riwayatHarian.length,
       itemBuilder: (context, index) {
         final item = _riwayatHarian[index];
+
+        final tanggal = DateFormat('yyyy-MM-dd')
+            .format(DateTime.parse(item['tanggal']));
+
+        final jamMasuk = item['jam_masuk'] != null
+            ? DateFormat('HH:mm')
+                .format(DateTime.parse("2024-01-01 ${item['jam_masuk']}"))
+            : "-";
+
         return Card(
           elevation: 0,
           margin: const EdgeInsets.only(bottom: 10),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: ListTile(
-            title: Text(item['tanggal'], style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text("${item['kategori_kerja']['nama_kategori_kerja']} - ${item['jam_masuk']}"),
+            title: Text(tanggal, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text("${item['kategori_kerja']['nama_kategori_kerja']} - $jamMasuk"),
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
