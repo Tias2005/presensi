@@ -6,6 +6,7 @@ import '../shared/theme.dart';
 import '../config.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+import '../widgets/app_refresh_wrapper.dart';
 
 class RiwayatPage extends StatefulWidget {
   const RiwayatPage({super.key});
@@ -85,7 +86,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
       ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
-        : RefreshIndicator(
+        : AppRefreshWrapper(
             onRefresh: _fetchRiwayat,
             child: ListView(
               padding: const EdgeInsets.all(16),

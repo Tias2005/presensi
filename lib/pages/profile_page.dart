@@ -45,6 +45,53 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Future<void> _showLogoutConfirmation() async {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          title: const Text(
+            "Konfirmasi",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            "Apakah Anda yakin ingin keluar dari akun Anda?",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); 
+              },
+              child: const Text(
+                "Tidak",
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop(); 
+                _logout(); 
+              },
+              child: const Text(
+                "Ya",
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_userData == null) {
@@ -76,7 +123,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 );
                 if (result == true) _loadProfile();
               } else if (value == 'logout') {
-                _logout();
+                _showLogoutConfirmation();
               }
             },
             itemBuilder: (BuildContext context) => [

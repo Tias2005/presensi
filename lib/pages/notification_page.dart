@@ -18,6 +18,8 @@ class NotificationPage extends StatefulWidget {
 class _NotificationPageState extends State<NotificationPage> {
   List _notifications = [];
   bool _isLoading = true;
+  bool _isSelectionMode = false;
+  Set<int> _selectedIds = {};
 
   @override
   void initState() {
@@ -163,51 +165,134 @@ class _NotificationPageState extends State<NotificationPage> {
     }
   }
 
-  void _confirmDelete(Map<String, dynamic> notif) {
+  Future<void> _deleteSelected() async {
+    final count = _selectedIds.length;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (_) => AlertDialog(
         title: const Text("Hapus Notifikasi"),
-        content: const Text("Apakah kamu yakin ingin menghapus notifikasi ini?"),
+        content: Text("Apakah Anda yakin ingin menghapus $count notifikasi ini?"),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Batal"),
+            child: const Text("Tidak"),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              _deleteNotification(notif['id_notifikasi']);
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(context); 
+              for (var id in _selectedIds) {
+                await _deleteNotification(id);
+              }
+              if (!mounted) return; 
+              setState(() {
+                _selectedIds.clear();
+                _isSelectionMode = false;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text("$count notifikasi telah berhasil dihapus"),
+                  backgroundColor: Colors.green,
+                ),
+              );
             },
-            child: const Text("Iya", style: TextStyle(color: Colors.white)),
+            child: const Text("Ya", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
+  // void _confirmDelete(Map<String, dynamic> notif) {
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text("Hapus Notifikasi"),
+  //       content: const Text("Apakah kamu yakin ingin menghapus notifikasi ini?"),
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           child: const Text("Batal"),
+  //         ),
+  //         ElevatedButton(
+  //           style: ElevatedButton.styleFrom(
+  //             backgroundColor: Colors.red,
+  //           ),
+  //           onPressed: () {
+  //             Navigator.pop(context);
+  //             _deleteNotification(notif['id_notifikasi']);
+  //           },
+  //           child: const Text("Iya", style: TextStyle(color: Colors.white)),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  void _toggleSelection(int id) {
+    setState(() {
+      _isSelectionMode = true;
+
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+        if (_selectedIds.isEmpty) {
+          _isSelectionMode = false;
+        }
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  void _selectAll() {
+    setState(() {
+      if (_selectedIds.length == _notifications.length) {
+        _selectedIds.clear();
+        _isSelectionMode = false;
+      } else {
+        _selectedIds =
+            _notifications.map<int>((e) => e['id_notifikasi'] as int).toSet();
+        _isSelectionMode = true;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background, 
-      appBar: AppBar(
-        title: const Text(
-          "Notifikasi", 
-          style: TextStyle(
-            color: Colors.white, 
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          )
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.white),
+          title: _isSelectionMode
+              ? Text(
+                  "${_selectedIds.length} dipilih dari ${_notifications.length}",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              : const Text(
+                  "Notifikasi",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+          actions: _isSelectionMode
+              ? [
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.white),
+                    onPressed:
+                        _selectedIds.isEmpty ? null : () => _deleteSelected(),
+                  )
+                ]
+              : [],
         ),
-        backgroundColor: AppColors.primary, 
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white), 
-        centerTitle: false,
-      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
           : _notifications.isEmpty
@@ -224,56 +309,105 @@ class _NotificationPageState extends State<NotificationPage> {
               : RefreshIndicator(
                   color: AppColors.primary,
                   onRefresh: _fetchNotifications,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(vertical: 10), 
-                    itemCount: _notifications.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 2), 
-                    itemBuilder: (context, index) {
-                      final notif = _notifications[index];
-                      bool isUnread = notif['status_baca'] == 0;           
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        tileColor: isUnread 
-                            ? AppColors.primary.withValues(alpha: 0.08) 
-                            : Colors.white,
-                        leading: CircleAvatar(
-                          radius: 22,
-                          backgroundColor: isUnread ? AppColors.primary : Colors.grey[200],
-                          child: Icon(
-                            isUnread ? Icons.notifications_active : Icons.notifications_none,
-                            color: isUnread ? Colors.white : Colors.grey[500],
-                            size: 20,
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    children: [
+
+                      if (_isSelectionMode)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: _selectedIds.length == _notifications.length,
+                                onChanged: (_) => _selectAll(),
+                              ),
+                              const Text(
+                                "Pilih Semua",
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ],
                           ),
                         ),
-                        title: Text(
-                          notif['judul'] ?? "Info Presensi", 
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: isUnread ? FontWeight.bold : FontWeight.w500,
-                            color: isUnread ? Colors.black87 : Colors.grey[700],
-                          ),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 4),
-                            Text(
-                              DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(notif['created_at'])),
-                              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+
+                      ...List.generate(_notifications.length, (index) {
+                        final notif = _notifications[index];
+                        bool isUnread = notif['status_baca'] == 0;
+
+                        return ListTile(
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          tileColor: isUnread
+                              ? AppColors.primary.withValues(alpha: 0.08)
+                              : Colors.white,
+
+                          leading: _isSelectionMode
+                              ? Checkbox(
+                                  value: _selectedIds.contains(notif['id_notifikasi']),
+                                  onChanged: (_) =>
+                                      _toggleSelection(notif['id_notifikasi']),
+                                )
+                              : CircleAvatar(
+                                  radius: 22,
+                                  backgroundColor:
+                                      isUnread ? AppColors.primary : Colors.grey[200],
+                                  child: Icon(
+                                    isUnread
+                                        ? Icons.notifications_active
+                                        : Icons.notifications_none,
+                                    color: isUnread
+                                        ? Colors.white
+                                        : Colors.grey[500],
+                                    size: 20,
+                                  ),
+                                ),
+
+                          title: Text(
+                            notif['judul'] ?? "Info Presensi",
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight:
+                                  isUnread ? FontWeight.bold : FontWeight.w500,
+                              color: isUnread
+                                  ? Colors.black87
+                                  : Colors.grey[700],
                             ),
-                          ],
-                        ),
-                        trailing: isUnread 
-                          ? Container(
-                              width: 8, 
-                              height: 8, 
-                              decoration: const BoxDecoration(color: Colors.orange, shape: BoxShape.circle) 
-                            )
-                          : null,
-                        onTap: () => _showNotifDetail(notif), 
-                        onLongPress: () => _confirmDelete(notif),
-                      );
-                    },
+                          ),
+
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              DateFormat('dd MMM yyyy, HH:mm')
+                                  .format(DateTime.parse(notif['created_at'])),
+                              style:
+                                  TextStyle(fontSize: 12, color: Colors.grey[500]),
+                            ),
+                          ),
+
+                          trailing: !_isSelectionMode && isUnread
+                              ? Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.orange,
+                                    shape: BoxShape.circle,
+                                  ),
+                                )
+                              : null,
+
+                          onTap: () {
+                            if (_isSelectionMode) {
+                              _toggleSelection(notif['id_notifikasi']);
+                            } else {
+                              _showNotifDetail(notif);
+                            }
+                          },
+
+                          onLongPress: () =>
+                              _toggleSelection(notif['id_notifikasi']),
+                        );
+                      }),
+                    ],
                   ),
                 ),
     );
