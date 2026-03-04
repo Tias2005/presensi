@@ -5,7 +5,7 @@ import '../shared/theme.dart';
 import 'login_page.dart';
 import 'edit_profile_page.dart';
 import '../config.dart';
-
+import '../widgets/app_refresh_wrapper.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -54,7 +54,7 @@ class _ProfilePageState extends State<ProfilePage> {
             borderRadius: BorderRadius.circular(15),
           ),
           title: const Text(
-            "Konfirmasi",
+            "Keluar Akun",
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           content: const Text(
@@ -151,9 +151,12 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
+      body: AppRefreshWrapper(
+        onRefresh: _loadProfile,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
             Container(
               width: double.infinity,
               padding: const EdgeInsets.only(bottom: 30, top: 10),
@@ -220,7 +223,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

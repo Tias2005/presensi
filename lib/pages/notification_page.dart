@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/theme.dart';
 import '../config.dart';
 import 'package:intl/intl.dart';
+import '../widgets/app_refresh_wrapper.dart';
 
 class NotificationPage extends StatefulWidget {
   final String userId;
@@ -306,7 +307,7 @@ class _NotificationPageState extends State<NotificationPage> {
                     ],
                   ),
                 )
-              : RefreshIndicator(
+              : AppRefreshWrapper(
                   color: AppColors.primary,
                   onRefresh: _fetchNotifications,
                   child: ListView(
