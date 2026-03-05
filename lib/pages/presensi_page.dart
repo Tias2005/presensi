@@ -387,7 +387,7 @@ class _StepFaceState extends State<_StepFace> {
       if (score > 0.70) { 
         widget.onResult(photo);
       } else {
-        throw "Verifikasi gagal. Skor kemiripan: ${(score * 100).toStringAsFixed(0)}%";
+        throw "Verifikasi gagal. Wajah Anda tidak match dengan profil Anda";
       }
     } catch (e) {
       if (!mounted) return;
