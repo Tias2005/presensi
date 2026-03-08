@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/theme.dart';
 import '../config.dart';
+import '../widgets/app_refresh_wrapper.dart';
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key});
@@ -87,17 +88,21 @@ class _CalendarPageState extends State<CalendarPage> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-        : SingleChildScrollView(
-            child: Column(
-              children: [
-                _buildCalendarCard(),
-                _buildLegendSection(),
-                if (_selectedDay != null) _buildSelectedDayDetail(),
-              ],
+        body: _isLoading 
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          : AppRefreshWrapper(
+              onRefresh: _fetchCalendarData,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  children: [
+                    _buildCalendarCard(),
+                    _buildLegendSection(),
+                    if (_selectedDay != null) _buildSelectedDayDetail(),
+                  ],
+                ),
+              ),
             ),
-          ),
     );
   }
 

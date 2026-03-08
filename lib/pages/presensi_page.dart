@@ -13,6 +13,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/theme.dart';
 import '../config.dart';
+import 'dart:async';
+import 'package:permission_handler/permission_handler.dart';
 
 class PresensiPage extends StatefulWidget {
   const PresensiPage({super.key});
@@ -76,7 +78,7 @@ class _PresensiPageState extends State<PresensiPage> {
       if (data['data'] != null) {
         _isCheckOut = true;
         _selectedModeId = data['data']['id_kategori_kerja'];
-        _currentStep = 2;
+        _currentStep = 1;
       }
     }
 
@@ -166,16 +168,33 @@ class _PresensiPageState extends State<PresensiPage> {
   }
 
   Widget _modeCard(int id, String title, String sub, IconData icon) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 15),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: Icon(icon, color: AppColors.primary, size: 30),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(sub),
-        onTap: () => setState(() { _selectedModeId = id; _currentStep = 2; }),
+
+  bool disabled = _isCheckOut && _selectedModeId != id;
+
+  return Card(
+    margin: const EdgeInsets.only(bottom: 15),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    child: ListTile(
+      leading: Icon(icon, color: disabled ? Colors.grey : AppColors.primary, size: 30),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: disabled ? Colors.grey : Colors.black
+        )
       ),
-    );
+      subtitle: Text(sub),
+      enabled: !disabled,
+      onTap: disabled
+          ? null
+          : () {
+              setState(() {
+                _selectedModeId = id;
+                _currentStep = 2;
+              });
+            },
+    ),
+  );
   }
 
   Widget _stepVerify() {
@@ -308,6 +327,8 @@ class _StepFaceState extends State<_StepFace> {
   }
 
   Future<void> _initCamera() async {
+    bool allowed = await _checkCameraPermission();
+    if (!allowed) return;
     final cams = await availableCameras();
     _camera = CameraController(cams[1], ResolutionPreset.high, enableAudio: false);
     await _camera!.initialize();
@@ -396,6 +417,48 @@ class _StepFaceState extends State<_StepFace> {
       if (mounted) setState(() => _isProcessing = false);
     }
   }
+
+  Future<bool> _checkCameraPermission() async {
+    var status = await Permission.camera.status;
+
+    if (status.isGranted) return true;
+
+    if (status.isDenied) {
+      status = await Permission.camera.request();
+      return status.isGranted;
+    }
+
+    if (status.isPermanentlyDenied) {
+      _showPermissionDialog(
+        "Izin Kamera Dibutuhkan",
+        "Untuk melakukan scan wajah Anda harus mengaktifkan izin kamera terlebih dahulu di pengaturan.",
+      );
+    }
+
+    return false;
+  }
+
+  void _showPermissionDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            child: const Text("Nanti Saja"),
+            onPressed: () => Navigator.pop(context),
+          ),
+          ElevatedButton(
+            child: const Text("Pengaturan"),
+            onPressed: () {
+              openAppSettings();
+            },
+          )
+        ],
+      ),
+    );
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -477,9 +540,22 @@ class _StepGeoState extends State<_StepGeo> {
   double _dist = 0;
   bool _loadingLocation = false;
   LatLng? _targetLocation;
+  StreamSubscription<Position>? _positionStream;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // hanya untuk WFA
+    if (widget.modeId == 3) {
+      _startLiveLocation();
+    }
+  }
 
   Future<void> _checkLocation() async {
   setState(() => _loadingLocation = true);
+  bool allowed = await _checkLocationPermission();
+  if (!allowed) return;
   try {
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
@@ -541,23 +617,88 @@ class _StepGeoState extends State<_StepGeo> {
         _loadingLocation = false;
       });
     }
-  } catch (e) {
-    if (mounted) {
-      setState(() => _loadingLocation = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Gagal mendapatkan lokasi: $e"))
-      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loadingLocation = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal mendapatkan lokasi: $e"))
+        );
+      }
     }
   }
-}
+
+  void _startLiveLocation() {
+    const LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.best,
+      distanceFilter: 3,
+    );
+
+    _positionStream =
+        Geolocator.getPositionStream(locationSettings: locationSettings)
+            .listen((Position position) {
+
+      setState(() {
+        _pos = position;
+        _isValid = true;
+      });
+    });
+  }
+
+  Future<bool> _checkLocationPermission() async {
+    var status = await Permission.location.status;
+
+    if (status.isGranted) return true;
+
+    if (status.isDenied) {
+      status = await Permission.location.request();
+      return status.isGranted;
+    }
+
+    if (status.isPermanentlyDenied) {
+      _showPermissionDialog(
+        "Izin Lokasi Dibutuhkan",
+        "Untuk melacak lokasi Anda harus mengaktifkan izin lokasi di pengaturan.",
+      );
+    }
+
+    return false;
+  }
+
+  void _showPermissionDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            child: const Text("Nanti Saja"),
+            onPressed: () => Navigator.pop(context),
+          ),
+          ElevatedButton(
+            child: const Text("Pengaturan"),
+            onPressed: () {
+              openAppSettings();
+            },
+          )
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         Expanded(
-          child: _pos == null 
-            ? const Center(child: Text("Klik tombol untuk melacak lokasi"))
+        child: _pos == null 
+            ? Center(
+                child: Text(
+                  widget.modeId == 3
+                      ? "Mendeteksi lokasi Anda..."
+                      : "Klik tombol untuk melacak lokasi",
+                ),
+              )
             : FlutterMap(
                 options: MapOptions(initialCenter: LatLng(_pos!.latitude, _pos!.longitude), initialZoom: 16),
                 children: [
@@ -597,17 +738,36 @@ class _StepGeoState extends State<_StepGeo> {
               SizedBox(
                 width: double.infinity, height: 50,
                 child: ElevatedButton(
-                  onPressed: _loadingLocation ? null : (_pos == null ? _checkLocation : (_isValid ? () => widget.onResult(_pos!) : null)),
-                  style: ElevatedButton.styleFrom(backgroundColor: _isValid || _pos == null ? AppColors.primary : Colors.grey),
-                  child: _loadingLocation 
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : Text(_pos == null ? "LACAK LOKASI" : (_isValid ? "LANJUT VERIFIKASI" : "DI LUAR RADIUS"), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
+                onPressed: widget.modeId == 3
+                    ? (_pos != null ? () => widget.onResult(_pos!) : null)
+                    : (_loadingLocation
+                        ? null
+                        : (_pos == null
+                            ? _checkLocation
+                            : (_isValid ? () => widget.onResult(_pos!) : null))),
+                style: ElevatedButton.styleFrom(backgroundColor: _isValid || _pos == null ? AppColors.primary : Colors.grey),
+                child: _loadingLocation 
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : Text(
+                      widget.modeId == 3
+                          ? "LANJUT VERIFIKASI"
+                          : (_pos == null
+                              ? "LACAK LOKASI"
+                              : (_isValid ? "LANJUT VERIFIKASI" : "DI LUAR RADIUS")),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+                    ),
+              ),
               ),
             ],
           ),
         )
       ],
     );
+  }
+
+  @override
+  void dispose() {
+    _positionStream?.cancel();
+    super.dispose();
   }
 }

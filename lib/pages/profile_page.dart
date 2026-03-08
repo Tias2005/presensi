@@ -155,75 +155,80 @@ class _ProfilePageState extends State<ProfilePage> {
         onRefresh: _loadProfile,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.only(bottom: 30, top: 10),
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(30),
-                  bottomRight: Radius.circular(30),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Stack(
-                    alignment: Alignment.bottomRight,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height,
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.only(bottom: 30, top: 10),
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(30),
+                      bottomRight: Radius.circular(30),
+                    ),
+                  ),
+                  child: Column(
                     children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 4),
-                        ),
-                        child: CircleAvatar(
-                          radius: 60,
-                          backgroundColor: Colors.white.withValues(alpha: 0.2),
-                          child: ClipOval(
-                            child: _userData!['foto_profil'] != null
-                                ? Image.network(
-                                    "$_baseUrl${_userData!['foto_profil']}",
-                                    width: 120,
-                                    height: 120,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return const Icon(Icons.person, size: 70, color: Colors.white);
-                                    },
-                                  )
-                                : const Icon(Icons.person, size: 70, color: Colors.white),
+                      Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 4),
+                            ),
+                            child: CircleAvatar(
+                              radius: 60,
+                              backgroundColor: Colors.white.withValues(alpha: 0.2),
+                              child: ClipOval(
+                                child: _userData!['foto_profil'] != null
+                                    ? Image.network(
+                                        "$_baseUrl${_userData!['foto_profil']}?t=${DateTime.now().millisecondsSinceEpoch}",
+                                        width: 120,
+                                        height: 120,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return const Icon(Icons.person, size: 70, color: Colors.white);
+                                        },
+                                      )
+                                    : const Icon(Icons.person, size: 70, color: Colors.white),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+                      Text(
+                        _userData!['nama_user'] ?? "-",
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        _userData!['jabatan'] ?? "Karyawan",
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.8), letterSpacing: 1.1),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 15),
-                  Text(
-                    _userData!['nama_user'] ?? "-",
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
+                  child: Column(
+                    children: [
+                      _buildProfileItem("Divisi", _userData!['divisi']?.toString() ?? "-", Icons.business_center_outlined),
+                      _buildProfileItem("Bergabung Sejak", _userData!['tanggal_bergabung']?.toString() ?? "-", Icons.calendar_today_outlined),
+                      _buildProfileItem("Email", _userData!['email_user']?.toString() ?? "-", Icons.email_outlined),
+                      _buildProfileItem("Telepon", _userData!['no_telepon']?.toString() ?? "-", Icons.phone_android_outlined),
+                      _buildProfileItem("Alamat", _userData!['alamat']?.toString() ?? "-", Icons.location_on_outlined),
+                    ],
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    _userData!['jabatan'] ?? "Karyawan",
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.8), letterSpacing: 1.1),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-            
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
-              child: Column(
-                children: [
-                  _buildProfileItem("Divisi", _userData!['divisi']?.toString() ?? "-", Icons.business_center_outlined),
-                  _buildProfileItem("Bergabung Sejak", _userData!['tanggal_bergabung']?.toString() ?? "-", Icons.calendar_today_outlined),
-                  _buildProfileItem("Email", _userData!['email_user']?.toString() ?? "-", Icons.email_outlined),
-                  _buildProfileItem("Telepon", _userData!['no_telepon']?.toString() ?? "-", Icons.phone_android_outlined),
-                  _buildProfileItem("Alamat", _userData!['alamat']?.toString() ?? "-", Icons.location_on_outlined),
-                ],
-              ),
-            ),
-            ],
           ),
         ),
       ),

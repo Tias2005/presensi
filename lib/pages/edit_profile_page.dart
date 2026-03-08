@@ -270,11 +270,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
               const SizedBox(height: 20),
 
               OutlinedButton.icon(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FaceRegisterPage())),
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const FaceRegisterPage(),
+                    ),
+                  );
+
+                  if (!context.mounted) return;
+
+                  if (result == true) {
+                    Navigator.pop(context, true);
+                  }
+                },
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 50),
                   side: const BorderSide(color: AppColors.primary),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 icon: const Icon(Icons.face_retouching_natural),
                 label: const Text("UPDATE SCAN WAJAH (FOTO PROFIL)"),

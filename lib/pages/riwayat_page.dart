@@ -19,6 +19,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
   bool _isLoading = true;
   Map<String, dynamic> _ringkasan = {};
   List _riwayatHarian = [];
+  List _riwayatPengajuan = [];
   String _selectedBulan = DateTime.now().month.toString().padLeft(2, '0');
 
   @override
@@ -28,8 +29,8 @@ class _RiwayatPageState extends State<RiwayatPage> {
   }
 
   List<String> namaBulan = [
-    "Januari","Februari","Maret","April","Mei","Juni",
-    "Juli","Agustus","September","Oktober","November","Desember"
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
   ];
 
   Future<void> _fetchRiwayat() async {
@@ -46,6 +47,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
         setState(() {
           _ringkasan = data['ringkasan'];
           _riwayatHarian = data['riwayat_harian'];
+          _riwayatPengajuan = data['riwayat_pengajuan'] ?? [];
         });
       }
     } catch (e) {
@@ -59,81 +61,288 @@ class _RiwayatPageState extends State<RiwayatPage> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     final url = Uri.parse(
-      '${AppConfig.apiUrl}/export-riwayat-mobile?bulan=$_selectedBulan&token=$token',
+      '${AppConfig.apiUrl}/export-riwayat-mobile?token=$token',
     );
     await launchUrl(
       url,
       mode: LaunchMode.externalApplication,
-      webViewConfiguration: WebViewConfiguration(
-        headers: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  void _showDetailPresensi(Map detail) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text("Detail Presensi",
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+
+            _detailRow("Nama", detail['user']['nama_user']),
+            _detailRow("Divisi", detail['user']['divisi']['nama_divisi']),
+            _detailRow("Jabatan", detail['user']['jabatan']['nama_jabatan']),
+
+            const SizedBox(height: 10),
+
+            _detailRow("Waktu Masuk", detail['jam_masuk'] ?? "-"),
+            _detailRow("Waktu Pulang", detail['jam_pulang'] ?? "-"),
+            _detailRow("Lokasi Masuk", detail['lokasi_masuk'] ?? "-"),
+            _detailRow("Lokasi Pulang", detail['lokasi_pulang'] ?? "-"),
+            _detailRow(
+              "Kategori",
+              detail['kategori_kerja']['nama_kategori_kerja'] ??
+                  (detail['id_kategori_kerja'] == 1 ? 'WFO' : 'WFA'),
+            ),
+
+            _detailRow(
+              "Status",
+              detail['status_presensi']['nama_status_presensi'] ??
+                  (detail['id_status_presensi'] == 1
+                      ? 'Tepat Waktu'
+                      : 'Terlambat'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Tutup")),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 80, child: Text("$label:", style: const TextStyle(fontWeight: FontWeight.bold))),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+
+  void _showDetailPengajuan(Map detail) {
+
+    bool isLembur =
+        (detail['kategori']['nama_pengajuan'] ?? '')
+            .toLowerCase()
+            .contains('lembur');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text("Detail Pengajuan",
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+
+              _detailRow("Nama", detail['user']['nama_user']),
+              _detailRow("Divisi", detail['user']['divisi']['nama_divisi']),
+              _detailRow("Jabatan", detail['user']['jabatan']['nama_jabatan']),
+              _detailRow("Tipe", detail['kategori']['nama_pengajuan']),
+
+              const SizedBox(height: 10),
+
+              if (isLembur) ...[
+                _detailRow("Tanggal Lembur",
+                    detail['tanggal_mulai'].split(" ")[0]),
+                _detailRow("Jam Mulai", detail['jam_mulai'] ?? '--:--'),
+                _detailRow("Jam Selesai", detail['jam_selesai'] ?? '--:--'),
+              ] else ...[
+                _detailRow("Tanggal Mulai",
+                    detail['tanggal_mulai'].split(" ")[0]),
+                _detailRow("Tanggal Selesai",
+                    detail['tanggal_selesai'].split(" ")[0]),
+              ],
+
+              const SizedBox(height: 10),
+
+              const Text("Alasan",
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(detail['alasan'] ?? "-"),
+
+              const SizedBox(height: 15),
+              if (detail['lampiran'] != null)
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.download),
+                  label: const Text("Download Lampiran"),
+                  onPressed: () async {
+                    final url = Uri.parse(
+                      '${AppConfig.apiUrl}/pengajuan/download/${detail['id_pengajuan']}',
+                    );
+
+                    await launchUrl(
+                      url,
+                      mode: LaunchMode.externalApplication,
+                    );
+                  },
+                )
+              else
+                const Text("Tidak ada lampiran",
+                    style: TextStyle(color: Colors.grey)),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Tutup")),
+        ],
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: const Text(
-          "Riwayat Presensi",
-          style: TextStyle(fontWeight: FontWeight.bold),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: Colors.grey[100],
+        appBar: AppBar(
+          title: const Text("Riwayat", style: TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
         ),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: false,
-      ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : AppRefreshWrapper(
-            onRefresh: _fetchRiwayat,
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _buildRingkasanCard(),
-                const SizedBox(height: 20),
-                _buildFilterAndExport(),
-                const SizedBox(height: 15),
-                const Text(
-                  "Daftar Riwayat",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold, 
-                    fontSize: 16,
-                    color: AppColors.primary
+          body: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : AppRefreshWrapper(
+                  onRefresh: _fetchRiwayat,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            children: [
+                              _buildRingkasanCard(),
+                              const SizedBox(height: 20),
+                              _buildFilterAndExport(),
+                            ],
+                          ),
+                        ),
+
+                        Container(
+                          color: Colors.white,
+                          child: TabBar(
+                            labelColor: AppColors.primary,
+                            unselectedLabelColor: Colors.grey,
+                            indicatorColor: AppColors.primary,
+                            tabs: const [
+                              Tab(text: "Presensi"),
+                              Tab(text: "Pengajuan"),
+                            ],
+                          ),
+                        ),
+
+                        SizedBox(
+                          height: 500,
+                          child: TabBarView(
+                            children: [
+                              _buildTabPresensiContent(),
+                              _buildTabPengajuanContent(),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 10),
-                _buildListRiwayat(),
-              ],
+            ),
+    );
+  }
+
+  Widget _buildTabPresensiContent() {
+    if (_riwayatHarian.isEmpty) return const Center(child: Text("Tidak ada data presensi"));
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _riwayatHarian.length,
+      itemBuilder: (context, index) {
+        final item = _riwayatHarian[index];
+        final tanggal = DateFormat('EEEE, dd MMM yyyy').format(DateTime.parse(item['tanggal']));
+        
+        return Card(
+          elevation: 0,
+          margin: const EdgeInsets.only(bottom: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: ListTile(
+            onTap: () => _showDetailPresensi(item), 
+            title: Text(tanggal, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            subtitle: Text("${item['kategori_kerja']['nama_kategori_kerja']} • Masuk: ${item['jam_masuk'] ?? '-'}"),
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: item['id_status_presensi'] == 1 ? Colors.green[50] : Colors.red[50],
+                borderRadius: BorderRadius.circular(8)
+              ),
+              child: Text(
+                item['status_presensi']['nama_status_presensi'],
+                style: TextStyle(color: item['id_status_presensi'] == 1 ? Colors.green : Colors.red, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTabPengajuanContent() {
+    if (_riwayatPengajuan.isEmpty) return const Center(child: Text("Belum ada riwayat pengajuan"));
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _riwayatPengajuan.length,
+      itemBuilder: (context, index) {
+        final item = _riwayatPengajuan[index];
+        final status = item['status_pengajuan'];
+        Color statusColor = status == "Disetujui" ? Colors.green : (status == "Ditolak" ? Colors.red : Colors.orange);
+
+        return Card(
+          elevation: 0,
+          margin: const EdgeInsets.only(bottom: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: ListTile(
+            onTap: () => _showDetailPengajuan(item),
+            title: Text(item['kategori']['nama_pengajuan'], style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text("Tanggal: ${item['tanggal_mulai']}"),
+            trailing: Text(
+              status,
+              style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
+            ),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildRingkasanCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05), 
-            blurRadius: 10,
-            offset: const Offset(0, 4)
-          )
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Icon(Icons.analytics_outlined, color: AppColors.primary, size: 20),
               const SizedBox(width: 8),
-              const Text("Ringkasan Bulan Ini", 
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text("Ringkasan Bulan Ini",
+                 style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 15),
@@ -162,14 +371,13 @@ class _RiwayatPageState extends State<RiwayatPage> {
 
   Widget _itemRingkasan(String label, String value, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+          Text(label, style: const TextStyle(fontSize: 12)),
+          Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
         ],
       ),
     );
@@ -182,7 +390,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: Colors.white, 
+              color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.grey.shade300)
             ),
@@ -203,66 +411,20 @@ class _RiwayatPageState extends State<RiwayatPage> {
           ),
         ),
         const SizedBox(width: 10),
-        SizedBox(
-          height: 48,
-          child: ElevatedButton.icon(
-            onPressed: _exportExcel,
-            icon: const Icon(Icons.file_download_outlined, size: 20),
-            label: const Text("Export"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: AppColors.primary,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12), 
-                side: const BorderSide(color: AppColors.primary)
-              ),
+        ElevatedButton.icon(
+          onPressed: _exportExcel,
+          icon: const Icon(Icons.file_download_outlined),
+          label: const Text("Export"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: AppColors.primary)
             ),
           ),
         )
       ],
-    );
-  }
-
-  Widget _buildListRiwayat() {
-    if (_riwayatHarian.isEmpty) return const Center(child: Padding(padding: EdgeInsets.only(top: 50), child: Text("Tidak ada data presensi")));
-    
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _riwayatHarian.length,
-      itemBuilder: (context, index) {
-        final item = _riwayatHarian[index];
-
-        final tanggal = DateFormat('yyyy-MM-dd')
-            .format(DateTime.parse(item['tanggal']));
-
-        final jamMasuk = item['jam_masuk'] != null
-            ? DateFormat('HH:mm')
-                .format(DateTime.parse("2024-01-01 ${item['jam_masuk']}"))
-            : "-";
-
-        return Card(
-          elevation: 0,
-          margin: const EdgeInsets.only(bottom: 10),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ListTile(
-            title: Text(tanggal, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text("${item['kategori_kerja']['nama_kategori_kerja']} - $jamMasuk"),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: item['id_status_presensi'] == 1 ? Colors.green[100] : Colors.red[100],
-                borderRadius: BorderRadius.circular(8)
-              ),
-              child: Text(
-                item['status_presensi']['nama_status_presensi'],
-                style: TextStyle(color: item['id_status_presensi'] == 1 ? Colors.green : Colors.red, fontSize: 12),
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }
