@@ -47,12 +47,23 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _openNotification() async {
     final prefs = await SharedPreferences.getInstance();
     final userDataString = prefs.getString('user_data');
+
     if (!mounted) return;
+
     if (userDataString != null) {
       final userData = jsonDecode(userDataString);
       String userId = userData['id_user'].toString();
-      await Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationPage(userId: userId)));
-      if (mounted) _loadInitialData();
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => NotificationPage(userId: userId),
+        ),
+      );
+
+      if (mounted) {
+        await _fetchUnreadCount(userId);
+      }
     }
   }
 
@@ -68,8 +79,16 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _initForegroundFetch() {
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      if (mounted) _loadInitialData();
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+      final prefs = await SharedPreferences.getInstance();
+      final userDataString = prefs.getString('user_data');
+
+      if (userDataString != null && mounted) {
+        final userData = jsonDecode(userDataString);
+        String userId = userData['id_user'].toString();
+
+        await _fetchUnreadCount(userId);
+      }
     });
   }
 
@@ -122,12 +141,28 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _fetchUnreadCount(String userId) async {
     try {
-      final response = await http.get(Uri.parse("${AppConfig.apiUrl}/notifications/unread-count/$userId"));
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      final response = await http.get(
+        Uri.parse("${AppConfig.apiUrl}/notifications/unread-count/$userId"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Accept": "application/json"
+        },
+      );
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (mounted) setState(() => _unreadCount = data['unread_count'] ?? 0);
+        if (mounted) {
+          setState(() {
+            _unreadCount = data['unread_count'] ?? 0;
+          });
+        }
       }
-    } catch (e) { debugPrint("Error count: $e"); }
+    } catch (e) {
+      debugPrint("Error count: $e");
+    }
   }
 
   Future<void> _fetchJadwalInfo() async {

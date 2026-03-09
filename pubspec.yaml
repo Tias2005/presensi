@@ -40,6 +40,7 @@ dependencies:
   permission_handler: ^11.3.1
 
 dev_dependencies:
+  flutter_launcher_icons: ^0.13.1
   flutter_test:
     sdk: flutter
 
@@ -53,3 +54,7 @@ flutter:
     - assets/models/mobilefacenet.tflite
     - assets/logo/logo_aplikasi_presensi.png
 
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo/logo_aplikasi_presensi.png"

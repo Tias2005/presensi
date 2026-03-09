@@ -74,55 +74,194 @@ class _RiwayatPageState extends State<RiwayatPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Text("Detail Presensi",
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        title: const Text(
+          "Detail Presensi",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.85,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
 
-            _detailRow("Nama", detail['user']['nama_user']),
-            _detailRow("Divisi", detail['user']['divisi']['nama_divisi']),
-            _detailRow("Jabatan", detail['user']['jabatan']['nama_jabatan']),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Foto Check In",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
 
-            const SizedBox(height: 10),
+                          if (detail['foto_masuk'] != null &&
+                              detail['foto_masuk'] != "")
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.network(
+                                "${AppConfig.storageUrl}${detail['foto_masuk']}",
+                                height: 150,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Container(
+                                    height: 150,
+                                    color: Colors.grey[200],
+                                    child: const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                },
+                                errorBuilder:
+                                    (context, error, stackTrace) {
+                                  return Container(
+                                    height: 150,
+                                    color: Colors.grey[200],
+                                    child: const Center(
+                                      child: Text("Foto masuk tidak bisa dimuat"),
+                                    ),
+                                  );
+                                },
+                              ),
+                            )
+                          else
+                            Container(
+                              height: 150,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text("Tidak ada foto masuk"),
+                            ),
+                        ],
+                      ),
+                    ),
 
-            _detailRow("Waktu Masuk", detail['jam_masuk'] ?? "-"),
-            _detailRow("Waktu Pulang", detail['jam_pulang'] ?? "-"),
-            _detailRow("Lokasi Masuk", detail['lokasi_masuk'] ?? "-"),
-            _detailRow("Lokasi Pulang", detail['lokasi_pulang'] ?? "-"),
-            _detailRow(
-              "Kategori",
-              detail['kategori_kerja']['nama_kategori_kerja'] ??
-                  (detail['id_kategori_kerja'] == 1 ? 'WFO' : 'WFA'),
+                    const SizedBox(width: 10),
+
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Foto Check Out",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+
+                          if (detail['foto_pulang'] != null &&
+                              detail['foto_pulang'] != "")
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.network(
+                                "${AppConfig.storageUrl}${detail['foto_pulang']}",
+                                height: 150,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Container(
+                                    height: 150,
+                                    color: Colors.grey[200],
+                                    child: const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                },
+                                errorBuilder:
+                                    (context, error, stackTrace) {
+                                  return Container(
+                                    height: 150,
+                                    color: Colors.grey[200],
+                                    child: const Center(
+                                      child: Text("Foto pulang tidak bisa dimuat"),
+                                    ),
+                                  );
+                                },
+                              ),
+                            )
+                          else
+                            Container(
+                              height: 150,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text("Belum ada foto pulang"),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                _detailRow("Nama", detail['user']?['nama_user'] ?? "-"),
+                _detailRow(
+                    "Divisi", detail['user']?['divisi']?['nama_divisi'] ?? "-"),
+                _detailRow(
+                    "Jabatan", detail['user']?['jabatan']?['nama_jabatan'] ?? "-"),
+
+                const SizedBox(height: 10),
+
+                _detailRow("Waktu Masuk", detail['jam_masuk'] ?? "-"),
+                _detailRow("Waktu Pulang", detail['jam_pulang'] ?? "-"),
+                _detailRow("Lokasi Masuk", detail['lokasi_masuk'] ?? "-"),
+                _detailRow("Lokasi Pulang", detail['lokasi_pulang'] ?? "-"),
+
+                _detailRow(
+                  "Kategori",
+                  detail['kategori_kerja']?['nama_kategori_kerja'] ??
+                      (detail['id_kategori_kerja'] == 1 ? 'WFO' : 'WFA'),
+                ),
+
+                _detailRow(
+                  "Status",
+                  detail['status_presensi']?['nama_status_presensi'] ??
+                      (detail['id_status_presensi'] == 1
+                          ? 'Tepat Waktu'
+                          : 'Terlambat'),
+                ),
+              ],
             ),
-
-            _detailRow(
-              "Status",
-              detail['status_presensi']['nama_status_presensi'] ??
-                  (detail['id_status_presensi'] == 1
-                      ? 'Tepat Waktu'
-                      : 'Terlambat'),
-            ),
-          ],
+          ),
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Tutup")),
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Tutup"),
+          ),
         ],
       ),
     );
   }
 
-  Widget _detailRow(String label, String value) {
+  Widget _detailRow(String label, dynamic value) {
+    final text = value?.toString() ?? "-";
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 80, child: Text("$label:", style: const TextStyle(fontWeight: FontWeight.bold))),
-          Expanded(child: Text(value)),
+          SizedBox(
+            width: 80,
+            child: Text(
+              "$label:",
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(child: Text(text)),
         ],
       ),
     );
