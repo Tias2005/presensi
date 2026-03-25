@@ -7,7 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
 import '../shared/theme.dart';
 import '../config.dart';
-
+import '../widgets/app_dialog.dart';
 
 class FormPengajuanPage extends StatefulWidget {
   final String tipe; 
@@ -95,141 +95,161 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
 
   Future<void> _submitForm() async {
     if (_tglMulai == null || _alasanController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Mohon isi tanggal dan alasan")),
+      AppDialog.show(
+        context,
+        message: "Mohon isi tanggal dan alasan",
       );
       return;
     }
 
     if (widget.tipe == "Lembur" && (_jamMulai == null || _jamSelesai == null)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Mohon isi jam mulai dan jam selesai lembur")),
+      AppDialog.show(
+        context,
+        message: "Mohon isi jam mulai dan jam selesai lembur",
       );
       return;
     }
 
     setState(() => _isSubmitting = true);
 
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+
     final userDataString = prefs.getString('user_data');
-    
+
     if (userDataString == null) {
       if (mounted) setState(() => _isSubmitting = false);
       return;
     }
-    
+
     final userData = jsonDecode(userDataString);
 
     try {
       var request = http.MultipartRequest(
-        'POST', 
-        Uri.parse("${AppConfig.apiUrl}/pengajuan/store")
+        'POST',
+        Uri.parse("${AppConfig.apiUrl}/pengajuan/store"),
       );
 
       request.fields['id_user'] = userData['id_user'].toString();
       request.fields['id_kategori_pengajuan'] = widget.idKategori.toString();
       request.fields['alasan'] = _alasanController.text;
-      
+
       String tglMulaiStr = DateFormat('yyyy-MM-dd').format(_tglMulai!);
       request.fields['tanggal_mulai'] = tglMulaiStr;
 
       if (widget.tipe == "Lembur") {
         request.fields['tanggal_selesai'] = tglMulaiStr;
-        request.fields['jam_mulai'] = "${_jamMulai!.hour.toString().padLeft(2, '0')}:${_jamMulai!.minute.toString().padLeft(2, '0')}";
-        request.fields['jam_selesai'] = "${_jamSelesai!.hour.toString().padLeft(2, '0')}:${_jamSelesai!.minute.toString().padLeft(2, '0')}";
+        request.fields['jam_mulai'] =
+            "${_jamMulai!.hour.toString().padLeft(2, '0')}:${_jamMulai!.minute.toString().padLeft(2, '0')}";
+        request.fields['jam_selesai'] =
+            "${_jamSelesai!.hour.toString().padLeft(2, '0')}:${_jamSelesai!.minute.toString().padLeft(2, '0')}";
       } else {
         if (_tglSelesai != null) {
-          request.fields['tanggal_selesai'] = DateFormat('yyyy-MM-dd').format(_tglSelesai!);
+          request.fields['tanggal_selesai'] =
+              DateFormat('yyyy-MM-dd').format(_tglSelesai!);
         }
       }
 
       if (_imageFile != null) {
-        request.files.add(await http.MultipartFile.fromPath('lampiran', _imageFile!.path));
+        request.files.add(
+          await http.MultipartFile.fromPath('lampiran', _imageFile!.path),
+        );
       }
 
       var response = await request.send();
-      // final respBody = await response.stream.bytesToString();
-      // final decodedResp = jsonDecode(respBody);
-
       if (!mounted) return;
 
       if (response.statusCode == 200) {
-        _showSuccessDialog();
+        AppDialog.show(
+          context,
+          message: "Pengajuan Berhasil Dikirim",
+          isSuccess: true,
+          onOk: () {
+            Navigator.pop(context);
+            Navigator.pop(context, true);
+          },
+        );
       } else {
         final respBody = await response.stream.bytesToString();
+
+        if (!mounted) return;
+
         final decodedResp = jsonDecode(respBody);
-        _showErrorDialog(decodedResp['message'] ?? "Gagal mengirim pengajuan");
-      }
-    } catch (e) {
-      debugPrint("Error submit: $e");
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(content: Text("Terjadi kesalahan koneksi ke server")),
+
+        AppDialog.show(
+          context,
+          message: decodedResp['message'] ?? "Gagal mengirim pengajuan",
         );
       }
+    } catch (e) {
+      if (!mounted) return;
+
+      AppDialog.show(
+        context,
+        message: "Terjadi kesalahan koneksi ke server",
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
+    
+  // void _showSuccessDialog() {
+  //   showDialog(
+  //     context: context,
+  //     barrierDismissible: false,
+  //     builder: (context) => AlertDialog(
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+  //       title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
+  //       content: const Text("Pengajuan Berhasil Dikirim", textAlign: TextAlign.center),
+  //       actions: [
+  //         Center(
+  //           child: TextButton(
+  //             onPressed: () {
+  //               Navigator.pop(context);
+  //               Navigator.pop(context, true); 
+  //             },
+  //             child: const Text("OK", style: TextStyle(fontWeight: FontWeight.bold)),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
-        content: const Text("Pengajuan Berhasil Dikirim", textAlign: TextAlign.center),
-        actions: [
-          Center(
-            child: TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context, true); 
-              },
-              child: const Text("OK", style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      barrierDismissible: true, 
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 60),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              "Jatah Tidak Mencukupi",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
-        actions: [
-          Center(
-            child: TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Tutup", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // void _showErrorDialog(String message) {
+  //   showDialog(
+  //     context: context,
+  //     barrierDismissible: true, 
+  //     builder: (context) => AlertDialog(
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+  //       title: const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 60),
+  //       content: Column(
+  //         mainAxisSize: MainAxisSize.min,
+  //         children: [
+  //           const Text(
+  //             "Jatah Tidak Mencukupi",
+  //             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+  //             textAlign: TextAlign.center,
+  //           ),
+  //           const SizedBox(height: 10),
+  //           Text(
+  //             message,
+  //             textAlign: TextAlign.center,
+  //             style: const TextStyle(color: Colors.grey),
+  //           ),
+  //         ],
+  //       ),
+  //       actions: [
+  //         Center(
+  //           child: TextButton(
+  //             onPressed: () => Navigator.pop(context),
+  //             child: const Text("Tutup", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {

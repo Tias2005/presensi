@@ -15,6 +15,7 @@ import '../shared/theme.dart';
 import '../config.dart';
 import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
+import '../widgets/app_dialog.dart';
 
 class PresensiPage extends StatefulWidget {
   const PresensiPage({super.key});
@@ -33,6 +34,15 @@ class _PresensiPageState extends State<PresensiPage> {
   XFile? _capturedPhoto;
   Position? _currentPosition;
   Map<String, dynamic>? _configKantor;
+  Map<String, dynamic>? _userData;
+  String _formatDateTime(DateTime dt) {
+    return "${dt.day.toString().padLeft(2, '0')}/"
+          "${dt.month.toString().padLeft(2, '0')}/"
+          "${dt.year} "
+          "${dt.hour.toString().padLeft(2, '0')}:"
+          "${dt.minute.toString().padLeft(2, '0')}";
+  }
+  String? _currentAddress;
 
   Interpreter? _interpreter;
   final FaceDetector _faceDetector =
@@ -67,6 +77,7 @@ class _PresensiPageState extends State<PresensiPage> {
     }
 
     final user = jsonDecode(userDataStr);
+    _userData = user;
 
     final response = await http.get(
       Uri.parse('${AppConfig.apiUrl}/presensi/today/${user['id_user']}'),
@@ -149,7 +160,18 @@ class _PresensiPageState extends State<PresensiPage> {
       case 3: return _StepGeo(
           modeId: _selectedModeId!,
           config: _configKantor!,
-          onResult: (pos) => setState(() { _currentPosition = pos; _currentStep = 4; }),
+          onResult: (pos) async {
+            String alamat = await _getAddressFromLatLng(
+              pos.latitude,
+              pos.longitude,
+            );
+
+            setState(() {
+              _currentPosition = pos;
+              _currentAddress = alamat;
+              _currentStep = 4;
+            });
+          },
         );
       case 4: return _stepVerify();
       default: return const SizedBox();
@@ -203,26 +225,97 @@ class _PresensiPageState extends State<PresensiPage> {
       child: Column(
         children: [
           Expanded(
-            child: Column(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(15),
-                  child: Image.file(File(_capturedPhoto!.path), height: 200, width: 200, fit: BoxFit.cover),
-                ),
-                const SizedBox(height: 20),
-                ListTile(
-                  leading: const Icon(Icons.location_on, color: Colors.red),
-                  title: const Text("Lokasi Terdeteksi"),
-                  subtitle: Text("${_currentPosition?.latitude}, ${_currentPosition?.longitude}"),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.work, color: AppColors.primary),
-                  title: const Text("Mode Kerja"),
-                  subtitle: Text(_selectedModeId == 1 ? "WFO" : _selectedModeId == 2 ? "WFH" : "WFA"),
-                ),
-              ],
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: Image.file(
+                      File(_capturedPhoto!.path),
+                      height: 200,
+                      width: 200,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.person),
+                          title: const Text("Nama"),
+                          subtitle: Text(_userData?['nama_user'] ?? "-"),
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.work),
+                          title: const Text("Jabatan"),
+                          subtitle: Text(_userData?['jabatan'] ?? "-"),
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.apartment),
+                          title: const Text("Divisi"),
+                          subtitle: Text(_userData?['divisi'] ?? "-"),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: ListTile(
+                      leading: const Icon(Icons.location_on, color: Colors.red),
+                      title: const Text("Lokasi"),
+                      subtitle: Text(
+                        "${_currentPosition?.latitude}, ${_currentPosition?.longitude}\n${_currentAddress ?? 'Mengambil alamat...'}",
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: ListTile(
+                      leading: const Icon(Icons.work_outline, color: AppColors.primary),
+                      title: const Text("Mode Kerja"),
+                      subtitle: Text(
+                        _selectedModeId == 1
+                            ? "WFO"
+                            : _selectedModeId == 2
+                                ? "WFH"
+                                : "WFA",
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.calendar_today),
+                          title: const Text("Tanggal"),
+                          subtitle: Text(_formatDateTime(DateTime.now()).split(" ")[0]),
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.access_time),
+                          title: Text(_isCheckOut ? "Jam Check Out" : "Jam Check In"),
+                          subtitle: Text(_formatDateTime(DateTime.now()).split(" ")[1]),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
+
           SizedBox(
             width: double.infinity,
             height: 55,
@@ -290,16 +383,23 @@ class _PresensiPageState extends State<PresensiPage> {
 
       if (response.statusCode == 200) {
         if (!mounted) return;
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(responseData['message'] ?? "Presensi Berhasil!"), backgroundColor: Colors.green)
-        );
+          AppDialog.show(
+            context,
+            message: responseData['message'] ?? "Presensi Berhasil!",
+            isSuccess: true,
+            onOk: () {
+              Navigator.pop(context, true);
+            },
+          );
       } else {
         throw responseData['message'] ?? "Gagal menyimpan data (Error ${response.statusCode})";
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+        AppDialog.show(
+          context,
+          message: e.toString(),
+        );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -412,7 +512,10 @@ class _StepFaceState extends State<_StepFace> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+        AppDialog.show(
+          context,
+          message: e.toString(),
+        );
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -620,9 +723,10 @@ class _StepGeoState extends State<_StepGeo> {
     } catch (e) {
       if (mounted) {
         setState(() => _loadingLocation = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Gagal mendapatkan lokasi: $e"))
-        );
+          AppDialog.show(
+            context,
+            message: "Gagal mendapatkan lokasi: $e",
+          );
       }
     }
   }

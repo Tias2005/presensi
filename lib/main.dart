@@ -7,8 +7,12 @@ import 'pages/login_page.dart';
 import 'pages/dashboard_page.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'dart:developer' as dev;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 late List<CameraDescription> cameras;
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
 
 @pragma('vm:entry-point')
   Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -18,8 +22,17 @@ late List<CameraDescription> cameras;
 
   Future<void> main() async {
     WidgetsFlutterBinding.ensureInitialized();
+
     await Firebase.initializeApp();
-    
+
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const InitializationSettings initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
+
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
@@ -28,14 +41,45 @@ late List<CameraDescription> cameras;
       sound: true,
     );
 
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      dev.log("Notif masuk: ${message.notification?.title}");
+
+      if (message.notification != null) {
+        showLocalNotification(
+          message.notification!.title,
+          message.notification!.body,
+        );
+      }
+    });
+
     await initializeDateFormatting('id_ID', null);
-    
+
     cameras = await availableCameras();
-    
+
     final prefs = await SharedPreferences.getInstance();
     final String? token = prefs.getString('token');
 
     runApp(MyApp(isLoggedIn: token != null));
+  }
+
+  void showLocalNotification(String? title, String? body) async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+      'high_importance_channel',
+      'High Importance Notifications',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+
+    const NotificationDetails notificationDetails =
+        NotificationDetails(android: androidDetails);
+
+    await flutterLocalNotificationsPlugin.show(
+      0,
+      title,
+      body,
+      notificationDetails,
+    );
   }
 
 class MyApp extends StatelessWidget {
