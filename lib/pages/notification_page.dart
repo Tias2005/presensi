@@ -68,7 +68,7 @@ class _NotificationPageState extends State<NotificationPage> {
               ),
               const SizedBox(height: 8),
               Text(
-                DateFormat('dd MMMM yyyy, HH:mm').format(DateTime.parse(notif['created_at'])),
+                DateFormat('dd MMMM yyyy, HH:mm').format(DateTime.parse(notif['created_at']).toLocal()),
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
               const Divider(height: 32),
@@ -352,7 +352,7 @@ class _NotificationPageState extends State<NotificationPage> {
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
                               DateFormat('dd MMM yyyy, HH:mm')
-                                  .format(DateTime.parse(notif['created_at'])),
+                                  .format(DateTime.parse(notif['created_at']).toLocal()),
                               style:
                                   TextStyle(fontSize: 12, color: Colors.grey[500]),
                             ),
