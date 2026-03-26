@@ -165,7 +165,7 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
           message: "Pengajuan Berhasil Dikirim",
           isSuccess: true,
           onOk: () {
-            Navigator.pop(context);
+            // Navigator.pop(context);
             Navigator.pop(context, true);
           },
         );
@@ -193,64 +193,6 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
     }
   }
     
-  // void _showSuccessDialog() {
-  //   showDialog(
-  //     context: context,
-  //     barrierDismissible: false,
-  //     builder: (context) => AlertDialog(
-  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-  //       title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
-  //       content: const Text("Pengajuan Berhasil Dikirim", textAlign: TextAlign.center),
-  //       actions: [
-  //         Center(
-  //           child: TextButton(
-  //             onPressed: () {
-  //               Navigator.pop(context);
-  //               Navigator.pop(context, true); 
-  //             },
-  //             child: const Text("OK", style: TextStyle(fontWeight: FontWeight.bold)),
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
-  // void _showErrorDialog(String message) {
-  //   showDialog(
-  //     context: context,
-  //     barrierDismissible: true, 
-  //     builder: (context) => AlertDialog(
-  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-  //       title: const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 60),
-  //       content: Column(
-  //         mainAxisSize: MainAxisSize.min,
-  //         children: [
-  //           const Text(
-  //             "Jatah Tidak Mencukupi",
-  //             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-  //             textAlign: TextAlign.center,
-  //           ),
-  //           const SizedBox(height: 10),
-  //           Text(
-  //             message,
-  //             textAlign: TextAlign.center,
-  //             style: const TextStyle(color: Colors.grey),
-  //           ),
-  //         ],
-  //       ),
-  //       actions: [
-  //         Center(
-  //           child: TextButton(
-  //             onPressed: () => Navigator.pop(context),
-  //             child: const Text("Tutup", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

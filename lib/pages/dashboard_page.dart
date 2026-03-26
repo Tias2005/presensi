@@ -29,6 +29,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Map<String, dynamic>? _todayPresence;
   Map<String, dynamic>? _jamKerja;
   Map<String, dynamic>? _jatahCuti;
+  int? _sisaCuti;
   Map<String, dynamic>? _lokasiSetting;
   List<dynamic> _hariKerja = [];
   bool _isLoading = true;
@@ -92,6 +93,25 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
+  Future<void> _fetchSisaCuti(String userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse("${AppConfig.apiUrl}/jatah-cuti/karyawan/$userId"),
+      );
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        if (mounted) {
+          setState(() {
+            _sisaCuti = result['data']['sisa'] ?? 0;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error sisa cuti: $e");
+    }
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -113,6 +133,7 @@ class _DashboardPageState extends State<DashboardPage> {
         _fetchTodayPresence(userId),
         _fetchUnreadCount(userId),
         _fetchJadwalInfo(),
+        _fetchSisaCuti(userId),
       ]);
     }
   }
@@ -343,6 +364,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 children: [
                   _buildInfoSection("Kebijakan Cuti", [
                     _buildStatRow("Jatah Cuti Tahunan", "${_jatahCuti?['jatah_tahunan_global'] ?? 0} Hari"),
+                    _buildStatRow("Sisa Jatah Cuti", "${_sisaCuti ?? 0} Hari"),
                   ]),
                   const Divider(height: 30),
                   _buildInfoSection("Pengaturan Jam Kerja", [

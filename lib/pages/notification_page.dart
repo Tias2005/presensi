@@ -7,6 +7,7 @@ import '../shared/theme.dart';
 import '../config.dart';
 import 'package:intl/intl.dart';
 import '../widgets/app_refresh_wrapper.dart';
+import '../widgets/app_dialog.dart';
 
 class NotificationPage extends StatefulWidget {
   final String userId;
@@ -192,11 +193,10 @@ class _NotificationPageState extends State<NotificationPage> {
                 _selectedIds.clear();
                 _isSelectionMode = false;
               });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("$count notifikasi telah berhasil dihapus"),
-                  backgroundColor: Colors.green,
-                ),
+              AppDialog.show(
+                context,
+                message: "$count notifikasi telah berhasil dihapus",
+                isSuccess: true,
               );
             },
             child: const Text("Ya", style: TextStyle(color: Colors.white)),
@@ -205,33 +205,6 @@ class _NotificationPageState extends State<NotificationPage> {
       ),
     );
   }
-
-  // void _confirmDelete(Map<String, dynamic> notif) {
-  //   showDialog(
-  //     context: context,
-  //     builder: (context) => AlertDialog(
-  //       title: const Text("Hapus Notifikasi"),
-  //       content: const Text("Apakah kamu yakin ingin menghapus notifikasi ini?"),
-  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-  //       actions: [
-  //         TextButton(
-  //           onPressed: () => Navigator.pop(context),
-  //           child: const Text("Batal"),
-  //         ),
-  //         ElevatedButton(
-  //           style: ElevatedButton.styleFrom(
-  //             backgroundColor: Colors.red,
-  //           ),
-  //           onPressed: () {
-  //             Navigator.pop(context);
-  //             _deleteNotification(notif['id_notifikasi']);
-  //           },
-  //           child: const Text("Iya", style: TextStyle(color: Colors.white)),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
 
   void _toggleSelection(int id) {
     setState(() {

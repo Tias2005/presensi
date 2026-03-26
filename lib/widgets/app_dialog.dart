@@ -6,6 +6,10 @@ class AppDialog {
     required String message,
     bool isSuccess = false,
     bool barrierDismissible = false,
+    bool isConfirm = false,
+    String confirmText = "Ya",
+    String cancelText = "Batal",
+    VoidCallback? onConfirm,
     VoidCallback? onOk,
   }) {
     showDialog(
@@ -34,6 +38,26 @@ class AppDialog {
           )
         ],
       ),
+    ); 
+  }
+
+  static void showLoading(BuildContext context, {String message = "Loading..."}) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 20),
+            Expanded(child: Text(message)),
+          ],
+        ),
+      ),
     );
   }
+
 }
