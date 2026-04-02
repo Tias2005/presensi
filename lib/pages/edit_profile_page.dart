@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'dart:developer' as dev;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -10,6 +11,7 @@ import '../shared/theme.dart';
 import 'face_register_page.dart';
 import '../config.dart';
 import '../widgets/app_dialog.dart';
+import 'package:geocoding/geocoding.dart';
 
 class EditProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -87,6 +89,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _selectedLocation = currentLatLng;
       });
 
+      await _getAddressFromLatLng(currentLatLng);
+
       _mapController.move(currentLatLng, 15);
       _showSnackBar("Lokasi rumah berhasil diarahkan ke posisi Anda.");
     } catch (e) {
@@ -95,6 +99,28 @@ class _EditProfilePageState extends State<EditProfilePage> {
       setState(() => _isLoading = false);
     }
   }
+
+  Future<void> _getAddressFromLatLng(LatLng position) async {
+  try {
+    List<Placemark> placemarks = await placemarkFromCoordinates(
+      position.latitude,
+      position.longitude,
+    );
+
+    if (placemarks.isNotEmpty) {
+      final place = placemarks.first;
+
+      String alamat =
+          "${place.street ?? ''}, ${place.subLocality ?? ''}, ${place.locality ?? ''}, ${place.administrativeArea ?? ''}";
+
+      setState(() {
+        _alamatController.text = alamat;
+      });
+    }
+  } catch (e) {
+    dev.log("Reverse geocoding error: $e");
+  }
+}
 
   void _showSnackBar(String msg) {
     if (!mounted) return;
@@ -327,10 +353,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
           options: MapOptions(
             initialCenter: _selectedLocation!,
             initialZoom: 15,
-            onTap: (tapPosition, point) {
+            onTap: (tapPosition, point) async {
               setState(() {
                 _selectedLocation = point;
               });
+
+              await _getAddressFromLatLng(point);
             },
           ),
           children: [
