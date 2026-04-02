@@ -6,9 +6,10 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import '../shared/theme.dart';
-import 'login_page.dart';
+// import 'login_page.dart';
 import 'face_register_page.dart';
 import '../config.dart';
+import '../widgets/app_dialog.dart';
 
 class EditProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -134,13 +135,32 @@ class _EditProfilePageState extends State<EditProfilePage> {
         if (data['password_changed'] == true) {
           await prefs.clear();
           if (!mounted) return;
-          _showDialogSuccess("Password berhasil diubah. Silakan login kembali.", isLogout: true);
+            AppDialog.show(
+              context,
+              message: "Password berhasil diubah. Silakan login kembali.",
+              isSuccess: true,
+              onOk: () {
+
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/login',
+                  (route) => false,
+                );
+              },
+            );
         } else {
           if (data['user'] != null) {
             await prefs.setString('user_data', jsonEncode(data['user']));
           }
           if (!mounted) return;
-          _showDialogSuccess("Profil berhasil diperbarui.");
+            AppDialog.show(
+              context,
+              message: "Profil berhasil diperbarui",
+              isSuccess: true,
+              onOk: () {
+                Navigator.pop(context, true); 
+              },
+            );
         }
       } else {
         throw data['message'] ?? "Terjadi kesalahan pada server.";
@@ -150,31 +170,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  void _showDialogSuccess(String msg, {bool isLogout = false}) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Icon(Icons.check_circle, color: AppColors.success, size: 50),
-        content: Text(msg, textAlign: TextAlign.center),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              if (isLogout) {
-                Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const LoginPage()), (r) => false);
-              } else {
-                Navigator.pop(context, true);
-              }
-            },
-            child: const Text("OK"),
-          )
-        ],
-      ),
-    );
   }
 
   @override

@@ -9,9 +9,9 @@ import 'package:image/image.dart' as img;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/theme.dart'; 
-import 'dashboard_page.dart';
+// import 'dashboard_page.dart';
 import '../config.dart';
-
+import '../widgets/app_dialog.dart';
 
 class FaceRegisterPage extends StatefulWidget {
   const FaceRegisterPage({super.key});
@@ -93,19 +93,27 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
+      dev.log(response.body, name: "REGISTER_FACE_RESPONSE");
+
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        userData['embedding_vector'] = responseData['user']['embedding_vector'];
-        await prefs.setString('user_data', jsonEncode(userData));
+
+        final prefs = await SharedPreferences.getInstance();
+
+        if (responseData['user'] != null) {
+          await prefs.setString('user_data', jsonEncode(responseData['user']));
+        }
 
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Berhasil! Wajah Anda kini terdaftar."), backgroundColor: AppColors.success));
-        
-        Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const DashboardPage()),
-            (route) => false);
+
+        AppDialog.show(
+          context,
+          message: "Berhasil! Wajah Anda kini terdaftar.",
+          isSuccess: true,
+          onOk: () {
+            Navigator.pop(context, true);
+          },
+        );
       } else {
         dev.log("Error Body: ${response.body}", name: "API_ERROR");
         throw "Gagal mendaftarkan wajah. Coba lagi nanti.";
