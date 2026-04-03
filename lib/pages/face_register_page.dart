@@ -12,6 +12,8 @@ import '../shared/theme.dart';
 // import 'dashboard_page.dart';
 import '../config.dart';
 import '../widgets/app_dialog.dart';
+import '../services/user_service.dart';
+import 'dart:math' as math;
 
 class FaceRegisterPage extends StatefulWidget {
   const FaceRegisterPage({super.key});
@@ -44,11 +46,14 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
 
   List<double> _extractEmbedding(File file, Face face) {
     final image = img.decodeImage(file.readAsBytesSync())!;
-    final crop = img.copyCrop(image,
-        x: face.boundingBox.left.toInt(),
-        y: face.boundingBox.top.toInt(),
-        width: face.boundingBox.width.toInt(),
-        height: face.boundingBox.height.toInt());
+
+    int x = face.boundingBox.left.toInt().clamp(0, image.width - 1);
+    int y = face.boundingBox.top.toInt().clamp(0, image.height - 1);
+    int w = face.boundingBox.width.toInt().clamp(0, image.width - x);
+    int h = face.boundingBox.height.toInt().clamp(0, image.height - y);
+
+    final crop = img.copyCrop(image, x: x, y: y, width: w, height: h);
+
     final resized = img.copyResize(crop, width: 112, height: 112);
 
     var input = [
@@ -60,7 +65,13 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
 
     var output = List.filled(1 * 192, 0.0).reshape([1, 192]);
     _interpreter?.run(input, output);
-    return List<double>.from(output[0]);
+    List<double> emb = List<double>.from(output[0]);
+
+    double norm = emb.fold(0, (sum, e) => sum + e * e);
+    norm = math.sqrt(norm);
+    emb = emb.map((e) => e / norm).toList();
+
+    return emb;
   }
 
   Future<void> _registerFace() async {
@@ -103,6 +114,8 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
         if (responseData['user'] != null) {
           await prefs.setString('user_data', jsonEncode(responseData['user']));
         }
+
+        await UserService.refreshUserData();
 
         if (!mounted) return;
 

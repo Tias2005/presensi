@@ -12,6 +12,7 @@ import 'face_register_page.dart';
 import '../config.dart';
 import '../widgets/app_dialog.dart';
 import 'package:geocoding/geocoding.dart';
+import '../services/user_service.dart';
 
 class EditProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -177,6 +178,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         } else {
           if (data['user'] != null) {
             await prefs.setString('user_data', jsonEncode(data['user']));
+            await UserService.refreshUserData();
           }
           if (!mounted) return;
             AppDialog.show(

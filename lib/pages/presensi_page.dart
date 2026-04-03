@@ -16,6 +16,7 @@ import '../config.dart';
 import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
 import '../widgets/app_dialog.dart';
+import '../services/user_service.dart';
 
 class PresensiPage extends StatefulWidget {
   const PresensiPage({super.key});
@@ -51,8 +52,13 @@ class _PresensiPageState extends State<PresensiPage> {
   @override
   void initState() {
     super.initState();
-    _loadModelAndConfig();
-    _checkTodayStatus();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await UserService.refreshUserData(); 
+    await _loadModelAndConfig();
+    await _checkTodayStatus();
   }
 
   Future<void> _loadModelAndConfig() async {
@@ -437,22 +443,33 @@ class _StepFaceState extends State<_StepFace> {
 
   List<double> _extract(File file, Face face) {
     final image = img.decodeImage(file.readAsBytesSync())!;
-    final crop = img.copyCrop(image, 
-      x: face.boundingBox.left.toInt(), 
-      y: face.boundingBox.top.toInt(), 
-      width: face.boundingBox.width.toInt(), 
-      height: face.boundingBox.height.toInt()
-    );
+
+    int x = face.boundingBox.left.toInt().clamp(0, image.width - 1);
+    int y = face.boundingBox.top.toInt().clamp(0, image.height - 1);
+    int w = face.boundingBox.width.toInt().clamp(0, image.width - x);
+    int h = face.boundingBox.height.toInt().clamp(0, image.height - y);
+
+    final crop = img.copyCrop(image, x: x, y: y, width: w, height: h);
+
     final resized = img.copyResize(crop, width: 112, height: 112);
-    
-    var input = [List.generate(112, (y) => List.generate(112, (x) {
-      final p = resized.getPixel(x, y);
-      return [p.r / 255.0, p.g / 255.0, p.b / 255.0];
-    }))];
-    
+
+    var input = [
+      List.generate(112, (y) => List.generate(112, (x) {
+            final p = resized.getPixel(x, y);
+            return [p.r / 255.0, p.g / 255.0, p.b / 255.0];
+          }))
+    ];
+
     var out = List.filled(1 * 192, 0.0).reshape([1, 192]);
     widget.interpreter.run(input, out);
-    return List<double>.from(out[0]);
+
+    List<double> emb = List<double>.from(out[0]);
+
+    double norm = emb.fold(0, (sum, e) => sum + e * e);
+    norm = math.sqrt(norm);
+    emb = emb.map((e) => e / norm).toList();
+
+    return emb;
   }
 
   double _cosineDistance(List<double> e1, List<double> e2) {
@@ -474,6 +491,8 @@ class _StepFaceState extends State<_StepFace> {
       if (faces.isEmpty) throw "Wajah tidak ditemukan!";
 
       final prefs = await SharedPreferences.getInstance();
+
+      await UserService.refreshUserData();
       final userDataStr = prefs.getString('user_data');
       if (userDataStr == null) throw "Sesi user tidak ditemukan";
       
@@ -502,7 +521,11 @@ class _StepFaceState extends State<_StepFace> {
         throw "Gagal membaca data wajah: $e";
       }
 
-      final current = _extract(File(photo.path), faces.first);
+      List<double> current = _extract(File(photo.path), faces.first);
+
+      double norm = math.sqrt(current.fold(0, (sum, e) => sum + e * e));
+      current = current.map((e) => e / norm).toList();
+
       double score = _cosineDistance(registered, current);
 
       if (score > 0.70) { 
