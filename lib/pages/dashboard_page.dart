@@ -42,7 +42,7 @@ class _DashboardPageState extends State<DashboardPage> {
     _requestNotificationPermission();
     _loadInitialData();
     _startClock();
-    _initForegroundFetch();
+    // _initForegroundFetch();
   }
 
   Future<void> _openNotification() async {
@@ -79,19 +79,19 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  void _initForegroundFetch() {
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-      final prefs = await SharedPreferences.getInstance();
-      final userDataString = prefs.getString('user_data');
+  // void _initForegroundFetch() {
+  //   FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+  //     final prefs = await SharedPreferences.getInstance();
+  //     final userDataString = prefs.getString('user_data');
 
-      if (userDataString != null && mounted) {
-        final userData = jsonDecode(userDataString);
-        String userId = userData['id_user'].toString();
+  //     if (userDataString != null && mounted) {
+  //       final userData = jsonDecode(userDataString);
+  //       String userId = userData['id_user'].toString();
 
-        await _fetchUnreadCount(userId);
-      }
-    });
-  }
+  //       await _fetchUnreadCount(userId);
+  //     }
+  //   });
+  // }
 
   Future<void> _fetchSisaCuti(String userId) async {
     try {

@@ -42,14 +42,12 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     );
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      dev.log("Notif masuk: ${message.notification?.title}");
+      dev.log("Notif masuk: ${message.data}");
 
-      if (message.notification != null) {
-        showLocalNotification(
-          message.notification!.title,
-          message.notification!.body,
-        );
-      }
+      showLocalNotification(
+        message.data['title'],
+        message.data['body'],
+      );
     });
 
     await initializeDateFormatting('id_ID', null);
