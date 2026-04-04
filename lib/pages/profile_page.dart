@@ -6,6 +6,8 @@ import 'login_page.dart';
 import 'edit_profile_page.dart';
 import '../config.dart';
 import '../widgets/app_refresh_wrapper.dart';
+import 'package:http/http.dart' as http;
+import 'dart:developer' as dev;
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -24,15 +26,34 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadProfile();
   }
 
-  Future<void> _loadProfile() async {
-    final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getString('user_data');
-    if (data != null) {
+Future<void> _loadProfile() async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
+
+  try {
+    final response = await http.get(
+      Uri.parse("${AppConfig.apiUrl}/user/me"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Accept": "application/json"
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
       setState(() {
-        _userData = jsonDecode(data);
+        _userData = data['user'];
       });
+
+      await prefs.setString('user_data', jsonEncode(data['user']));
+    } else {
+      dev.log("Gagal ambil profile", name: "PROFILE");
     }
+  } catch (e) {
+    dev.log("Error: $e", name: "PROFILE");
   }
+}
 
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
