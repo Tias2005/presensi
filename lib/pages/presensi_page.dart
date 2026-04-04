@@ -672,10 +672,10 @@ class _StepGeoState extends State<_StepGeo> {
   void initState() {
     super.initState();
 
-    // hanya untuk WFA
-    if (widget.modeId == 3) {
-      _startLiveLocation();
-    }
+    // // hanya untuk WFA
+    // if (widget.modeId == 3) {
+    //   _startLiveLocation();
+    // }
   }
 
   Future<void> _checkLocation() async {
@@ -754,22 +754,22 @@ class _StepGeoState extends State<_StepGeo> {
     }
   }
 
-  void _startLiveLocation() {
-    const LocationSettings locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.best,
-      distanceFilter: 3,
-    );
+  // void _startLiveLocation() {
+  //   const LocationSettings locationSettings = LocationSettings(
+  //     accuracy: LocationAccuracy.best,
+  //     distanceFilter: 3,
+  //   );
 
-    _positionStream =
-        Geolocator.getPositionStream(locationSettings: locationSettings)
-            .listen((Position position) {
+  //   _positionStream =
+  //       Geolocator.getPositionStream(locationSettings: locationSettings)
+  //           .listen((Position position) {
 
-      setState(() {
-        _pos = position;
-        _isValid = true;
-      });
-    });
-  }
+  //     setState(() {
+  //       _pos = position;
+  //       _isValid = true;
+  //     });
+  //   });
+  // }
 
   Future<bool> _checkLocationPermission() async {
     var status = await Permission.location.status;
@@ -820,11 +820,9 @@ class _StepGeoState extends State<_StepGeo> {
         Expanded(
         child: _pos == null 
             ? Center(
-                child: Text(
-                  widget.modeId == 3
-                      ? "Mendeteksi lokasi Anda..."
-                      : "Klik tombol untuk melacak lokasi",
-                ),
+              child: const Text(
+                "Klik tombol untuk melacak lokasi",
+              ),
               )
             : FlutterMap(
                 options: MapOptions(initialCenter: LatLng(_pos!.latitude, _pos!.longitude), initialZoom: 16),
@@ -865,25 +863,32 @@ class _StepGeoState extends State<_StepGeo> {
               SizedBox(
                 width: double.infinity, height: 50,
                 child: ElevatedButton(
-                onPressed: widget.modeId == 3
-                    ? (_pos != null ? () => widget.onResult(_pos!) : null)
-                    : (_loadingLocation
-                        ? null
-                        : (_pos == null
-                            ? _checkLocation
-                            : (_isValid ? () => widget.onResult(_pos!) : null))),
-                style: ElevatedButton.styleFrom(backgroundColor: _isValid || _pos == null ? AppColors.primary : Colors.grey),
-                child: _loadingLocation 
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : Text(
-                      widget.modeId == 3
-                          ? "LANJUT VERIFIKASI"
-                          : (_pos == null
-                              ? "LACAK LOKASI"
-                              : (_isValid ? "LANJUT VERIFIKASI" : "DI LUAR RADIUS")),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
-                    ),
-              ),
+                  onPressed: _loadingLocation
+                      ? null
+                      : (_pos == null
+                          ? _checkLocation
+                          : (_isValid ? () => widget.onResult(_pos!) : null)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isValid || _pos == null
+                        ? AppColors.primary
+                        : Colors.grey,
+                  ),
+                  child: _loadingLocation
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : Text(
+                          widget.modeId == 3
+                              ? (_pos == null
+                                  ? "LACAK LOKASI"
+                                  : "LANJUT VERIFIKASI")
+                              : (_pos == null
+                                  ? "LACAK LOKASI"
+                                  : (_isValid
+                                      ? "LANJUT VERIFIKASI"
+                                      : "DI LUAR RADIUS")),
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                ),
               ),
             ],
           ),

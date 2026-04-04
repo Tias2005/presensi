@@ -368,8 +368,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   ]),
                   const Divider(height: 30),
                   _buildInfoSection("Pengaturan Jam Kerja", [
-                    _buildStatRow("Jam Masuk Utama", (_jamKerja?['jam_masuk'] ?? "--:--").toString().padRight(5).substring(0,5)),
-                    _buildStatRow("Jam Pulang Utama", (_jamKerja?['jam_pulang'] ?? "--:--").toString().padRight(5).substring(0,5)),
+                    // _buildStatRow("Jam Masuk Utama", (_jamKerja?['jam_masuk'] ?? "--:--").toString().padRight(5).substring(0,5)),
+                    // _buildStatRow("Jam Pulang Utama", (_jamKerja?['jam_pulang'] ?? "--:--").toString().padRight(5).substring(0,5)),
                     _buildStatRow("Mulai Absen Masuk", (_jamKerja?['mulai_absen_masuk'] ?? "--:--").toString().padRight(5).substring(0,5)),
                     _buildStatRow("Batas Akhir Masuk", (_jamKerja?['akhir_absen_masuk'] ?? "--:--").toString().padRight(5).substring(0,5)),
                     _buildStatRow("Mulai Absen Pulang", (_jamKerja?['mulai_absen_pulang'] ?? "--:--").toString().padRight(5).substring(0,5)),
