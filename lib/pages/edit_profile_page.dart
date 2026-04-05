@@ -7,7 +7,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import '../shared/theme.dart';
-// import 'login_page.dart';
+import 'login_page.dart';
 import 'face_register_page.dart';
 import '../config.dart';
 import '../widgets/app_dialog.dart';
@@ -132,6 +132,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (_passLamaController.text.isNotEmpty &&
+        _passBaruController.text.isEmpty) {
+      _showSnackBar("Password baru harus diisi");
+      return;
+    }
+
+    if (_passBaruController.text.isNotEmpty &&
+        _passLamaController.text.isEmpty) {
+      _showSnackBar("Password lama harus diisi");
+      return;
+    }
+
+    if (_passBaruController.text.isNotEmpty &&
+        _passBaruController.text.length < 6) {
+      _showSnackBar("Password baru minimal 6 karakter");
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -167,10 +186,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
               message: "Password berhasil diubah. Silakan login kembali.",
               isSuccess: true,
               onOk: () {
-
-                Navigator.pushNamedAndRemoveUntil(
+                Navigator.pushAndRemoveUntil(
                   context,
-                  '/login',
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
                   (route) => false,
                 );
               },
