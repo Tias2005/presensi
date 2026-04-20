@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../shared/theme.dart';
 import '../config.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:intl/intl.dart';
 import '../widgets/app_refresh_wrapper.dart';
+import '../widgets/riwayat/ringkasan_card.dart';
+import '../widgets/riwayat/filter_export_bar.dart';
+import '../widgets/riwayat/tab_presensi.dart';
+import '../widgets/riwayat/tab_pengajuan.dart';
+import '../widgets/riwayat/detail_presensi_dialog.dart';
+import '../widgets/riwayat/detail_pengajuan_dialog.dart';
 
 class RiwayatPage extends StatefulWidget {
   const RiwayatPage({super.key});
@@ -27,11 +32,6 @@ class _RiwayatPageState extends State<RiwayatPage> {
     super.initState();
     _fetchRiwayat();
   }
-
-  List<String> namaBulan = [
-    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-  ];
 
   Future<void> _fetchRiwayat() async {
     setState(() => _isLoading = true);
@@ -60,284 +60,9 @@ class _RiwayatPageState extends State<RiwayatPage> {
   Future<void> _exportExcel() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-    final url = Uri.parse(
-      '${AppConfig.apiUrl}/export-riwayat-mobile?token=$token',
-    );
     await launchUrl(
-      url,
+      Uri.parse('${AppConfig.apiUrl}/export-riwayat-mobile?token=$token'),
       mode: LaunchMode.externalApplication,
-    );
-  }
-
-  void _showDetailPresensi(Map detail) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Text(
-          "Detail Presensi",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.85,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Foto Check In",
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-
-                          if (detail['foto_masuk'] != null &&
-                              detail['foto_masuk'] != "")
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.network(
-                                "${AppConfig.storageUrl}${detail['foto_masuk']}",
-                                height: 150,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                loadingBuilder:
-                                    (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return Container(
-                                    height: 150,
-                                    color: Colors.grey[200],
-                                    child: const Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                  );
-                                },
-                                errorBuilder:
-                                    (context, error, stackTrace) {
-                                  return Container(
-                                    height: 150,
-                                    color: Colors.grey[200],
-                                    child: const Center(
-                                      child: Text("Foto masuk tidak bisa dimuat"),
-                                    ),
-                                  );
-                                },
-                              ),
-                            )
-                          else
-                            Container(
-                              height: 150,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Text("Tidak ada foto masuk"),
-                            ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(width: 10),
-
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Foto Check Out",
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-
-                          if (detail['foto_pulang'] != null &&
-                              detail['foto_pulang'] != "")
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.network(
-                                "${AppConfig.storageUrl}${detail['foto_pulang']}",
-                                height: 150,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                loadingBuilder:
-                                    (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return Container(
-                                    height: 150,
-                                    color: Colors.grey[200],
-                                    child: const Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                  );
-                                },
-                                errorBuilder:
-                                    (context, error, stackTrace) {
-                                  return Container(
-                                    height: 150,
-                                    color: Colors.grey[200],
-                                    child: const Center(
-                                      child: Text("Foto pulang tidak bisa dimuat"),
-                                    ),
-                                  );
-                                },
-                              ),
-                            )
-                          else
-                            Container(
-                              height: 150,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Text("Belum ada foto pulang"),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                _detailRow("Nama", detail['user']?['nama_user'] ?? "-"),
-                _detailRow(
-                    "Divisi", detail['user']?['divisi']?['nama_divisi'] ?? "-"),
-                _detailRow(
-                    "Jabatan", detail['user']?['jabatan']?['nama_jabatan'] ?? "-"),
-
-                const SizedBox(height: 10),
-
-                _detailRow("Waktu Masuk", detail['jam_masuk'] ?? "-"),
-                _detailRow("Waktu Pulang", detail['jam_pulang'] ?? "-"),
-                _detailRow("Lokasi Masuk", detail['lokasi_masuk'] ?? "-"),
-                _detailRow("Lokasi Pulang", detail['lokasi_pulang'] ?? "-"),
-
-                _detailRow(
-                  "Kategori",
-                  detail['kategori_kerja']?['nama_kategori_kerja'] ??
-                      (detail['id_kategori_kerja'] == 1 ? 'WFO' : 'WFA'),
-                ),
-
-                _detailRow(
-                  "Status",
-                  detail['status_presensi']?['nama_status_presensi'] ??
-                      (detail['id_status_presensi'] == 1
-                          ? 'Tepat Waktu'
-                          : 'Terlambat'),
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Tutup"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _detailRow(String label, dynamic value) {
-    final text = value?.toString() ?? "-";
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              "$label:",
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(child: Text(text)),
-        ],
-      ),
-    );
-  }
-
-  void _showDetailPengajuan(Map detail) {
-
-    bool isLembur =
-        (detail['kategori']['nama_pengajuan'] ?? '')
-            .toLowerCase()
-            .contains('lembur');
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Text("Detail Pengajuan",
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-
-              _detailRow("Nama", detail['user']['nama_user']),
-              _detailRow("Divisi", detail['user']['divisi']['nama_divisi']),
-              _detailRow("Jabatan", detail['user']['jabatan']['nama_jabatan']),
-              _detailRow("Tipe", detail['kategori']['nama_pengajuan']),
-
-              const SizedBox(height: 10),
-
-              if (isLembur) ...[
-                _detailRow("Tanggal Lembur",
-                    detail['tanggal_mulai'].split(" ")[0]),
-                _detailRow("Jam Mulai", detail['jam_mulai'] ?? '--:--'),
-                _detailRow("Jam Selesai", detail['jam_selesai'] ?? '--:--'),
-              ] else ...[
-                _detailRow("Tanggal Mulai",
-                    detail['tanggal_mulai'].split(" ")[0]),
-                _detailRow("Tanggal Selesai",
-                    detail['tanggal_selesai'].split(" ")[0]),
-              ],
-
-              const SizedBox(height: 10),
-
-              const Text("Alasan",
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              Text(detail['alasan'] ?? "-"),
-
-              const SizedBox(height: 15),
-              if (detail['lampiran'] != null)
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.download),
-                  label: const Text("Download Lampiran"),
-                  onPressed: () async {
-                    final url = Uri.parse(
-                      '${AppConfig.apiUrl}/pengajuan/download/${detail['id_pengajuan']}',
-                    );
-
-                    await launchUrl(
-                      url,
-                      mode: LaunchMode.externalApplication,
-                    );
-                  },
-                )
-              else
-                const Text("Tidak ada lampiran",
-                    style: TextStyle(color: Colors.grey)),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Tutup")),
-        ],
-      ),
     );
   }
 
@@ -348,222 +73,73 @@ class _RiwayatPageState extends State<RiwayatPage> {
       child: Scaffold(
         backgroundColor: Colors.grey[100],
         appBar: AppBar(
-          title: const Text("Riwayat", style: TextStyle(fontWeight: FontWeight.bold)),
+          title: const Text("Riwayat",
+              style: TextStyle(fontWeight: FontWeight.bold)),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           elevation: 0,
         ),
-          body: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : AppRefreshWrapper(
-                  onRefresh: _fetchRiwayat,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            children: [
-                              _buildRingkasanCard(),
-                              const SizedBox(height: 20),
-                              _buildFilterAndExport(),
-                            ],
-                          ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : AppRefreshWrapper(
+                onRefresh: _fetchRiwayat,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            RingkasanCard(ringkasan: _ringkasan),
+                            const SizedBox(height: 20),
+                            FilterExportBar(
+                              selectedBulan: _selectedBulan,
+                              onBulanChanged: (v) {
+                                setState(() => _selectedBulan = v);
+                                _fetchRiwayat();
+                              },
+                              onExport: _exportExcel,
+                            ),
+                          ],
                         ),
+                      ),
 
-                        Container(
-                          color: Colors.white,
-                          child: TabBar(
-                            labelColor: AppColors.primary,
-                            unselectedLabelColor: Colors.grey,
-                            indicatorColor: AppColors.primary,
-                            tabs: const [
-                              Tab(text: "Presensi"),
-                              Tab(text: "Pengajuan"),
-                            ],
-                          ),
+                      Container(
+                        color: Colors.white,
+                        child: TabBar(
+                          labelColor: AppColors.primary,
+                          unselectedLabelColor: Colors.grey,
+                          indicatorColor: AppColors.primary,
+                          tabs: const [
+                            Tab(text: "Presensi"),
+                            Tab(text: "Pengajuan"),
+                          ],
                         ),
+                      ),
 
-                        SizedBox(
-                          height: 500,
-                          child: TabBarView(
-                            children: [
-                              _buildTabPresensiContent(),
-                              _buildTabPengajuanContent(),
-                            ],
-                          ),
+                      SizedBox(
+                        height: 500,
+                        child: TabBarView(
+                          children: [
+                            TabPresensi(
+                              riwayatHarian: _riwayatHarian,
+                              onTapItem: (item) =>
+                                  DetailPresensiDialog.show(context, item),
+                            ),
+                            TabPengajuan(
+                              riwayatPengajuan: _riwayatPengajuan,
+                              onTapItem: (item) =>
+                                  DetailPengajuanDialog.show(context, item),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-            ),
-    );
-  }
-
-  Widget _buildTabPresensiContent() {
-    if (_riwayatHarian.isEmpty) return const Center(child: Text("Tidak ada data presensi"));
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _riwayatHarian.length,
-      itemBuilder: (context, index) {
-        final item = _riwayatHarian[index];
-        final tanggal = DateFormat('EEEE, dd MMM yyyy').format(DateTime.parse(item['tanggal']));
-        
-        return Card(
-          elevation: 0,
-          margin: const EdgeInsets.only(bottom: 10),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ListTile(
-            onTap: () => _showDetailPresensi(item), 
-            title: Text(tanggal, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            subtitle: Text("${item['kategori_kerja']['nama_kategori_kerja']} • Masuk: ${item['jam_masuk'] ?? '-'}"),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: item['id_status_presensi'] == 1 ? Colors.green[50] : Colors.red[50],
-                borderRadius: BorderRadius.circular(8)
               ),
-              child: Text(
-                item['status_presensi']['nama_status_presensi'],
-                style: TextStyle(color: item['id_status_presensi'] == 1 ? Colors.green : Colors.red, fontSize: 11, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildTabPengajuanContent() {
-    if (_riwayatPengajuan.isEmpty) return const Center(child: Text("Belum ada riwayat pengajuan"));
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _riwayatPengajuan.length,
-      itemBuilder: (context, index) {
-        final item = _riwayatPengajuan[index];
-        final status = item['status_pengajuan'];
-        Color statusColor = status == "Disetujui" ? Colors.green : (status == "Ditolak" ? Colors.red : Colors.orange);
-
-        return Card(
-          elevation: 0,
-          margin: const EdgeInsets.only(bottom: 10),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ListTile(
-            onTap: () => _showDetailPengajuan(item),
-            title: Text(item['kategori']['nama_pengajuan'], style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text("Tanggal: ${item['tanggal_mulai']}"),
-            trailing: Text(
-              status,
-              style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildRingkasanCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
       ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Icon(Icons.analytics_outlined, color: AppColors.primary, size: 20),
-              const SizedBox(width: 8),
-              const Text("Ringkasan Bulan Ini",
-                 style: TextStyle(fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 15),
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2, 
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 2.5,
-            children: [
-              _itemRingkasan("Hadir", "${_ringkasan['hadir'] ?? 0} Hari", Colors.green),
-              _itemRingkasan("Terlambat", "${_ringkasan['terlambat'] ?? 0} Hari", Colors.orange),
-              _itemRingkasan("Izin", "${_ringkasan['izin'] ?? 0} Hari", Colors.lightBlue),
-              _itemRingkasan("Cuti", "${_ringkasan['cuti'] ?? 0} Hari", Colors.redAccent),
-              _itemRingkasan("Lembur", "${_ringkasan['lembur'] ?? 0} Jam", Colors.purple),
-              _itemRingkasan("WFO", "${_ringkasan['wfo'] ?? 0} Kali", Colors.teal),
-              _itemRingkasan("WFH", "${_ringkasan['wfh'] ?? 0} Kali", Colors.indigo),
-              _itemRingkasan("WFA", "${_ringkasan['wfa'] ?? 0} Kali", Colors.cyan),
-            ],
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _itemRingkasan(String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 12)),
-          Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterAndExport() {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300)
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedBulan,
-                isExpanded: true,
-                items: List.generate(12, (index) {
-                  String val = (index + 1).toString().padLeft(2, '0');
-                  return DropdownMenuItem(value: val, child: Text(namaBulan[index]));
-                }),
-                onChanged: (v) {
-                  setState(() => _selectedBulan = v!);
-                  _fetchRiwayat();
-                },
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        ElevatedButton.icon(
-          onPressed: _exportExcel,
-          icon: const Icon(Icons.file_download_outlined),
-          label: const Text("Export"),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: AppColors.primary)
-            ),
-          ),
-        )
-      ],
     );
   }
 }

@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../shared/theme.dart';
+import '../config.dart';
 import 'notification_page.dart';
 import 'profile_page.dart';
-import 'calendar_page.dart'; 
-import 'form_pengajuan_page.dart';
-import 'presensi_page.dart'; 
+import 'presensi_page.dart';
 import 'riwayat_page.dart';
-import '../config.dart';
-import 'dart:async';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import '../widgets/app_refresh_wrapper.dart';
+import '../widgets/dashboard/dashboard_appbar.dart';
+import '../widgets/dashboard/dashboard_content.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -26,12 +24,14 @@ class _DashboardPageState extends State<DashboardPage> {
   int _unreadCount = 0;
   int _currentIndex = 0;
   String _userName = "Memuat...";
+  String _displayMessage = "";
+  String _statusType = "work";
   Map<String, dynamic>? _todayPresence;
   Map<String, dynamic>? _jamKerja;
   Map<String, dynamic>? _jatahCuti;
-  int? _sisaCuti;
   Map<String, dynamic>? _lokasiSetting;
   List<dynamic> _hariKerja = [];
+  int? _sisaCuti;
   bool _isLoading = true;
   Timer? _timer;
   DateTime _now = DateTime.now();
@@ -42,74 +42,6 @@ class _DashboardPageState extends State<DashboardPage> {
     _requestNotificationPermission();
     _loadInitialData();
     _startClock();
-    // _initForegroundFetch();
-  }
-
-  Future<void> _openNotification() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userDataString = prefs.getString('user_data');
-
-    if (!mounted) return;
-
-    if (userDataString != null) {
-      final userData = jsonDecode(userDataString);
-      String userId = userData['id_user'].toString();
-
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => NotificationPage(userId: userId),
-        ),
-      );
-
-      if (mounted) {
-        await _fetchUnreadCount(userId);
-      }
-    }
-  }
-
-  Future<void> _requestNotificationPermission() async {
-    FirebaseMessaging messaging = FirebaseMessaging.instance;
-    await messaging.requestPermission(alert: true, badge: true, sound: true);
-  }
-
-  void _startClock() {
-    _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
-      if (mounted) setState(() => _now = DateTime.now());
-    });
-  }
-
-  // void _initForegroundFetch() {
-  //   FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-  //     final prefs = await SharedPreferences.getInstance();
-  //     final userDataString = prefs.getString('user_data');
-
-  //     if (userDataString != null && mounted) {
-  //       final userData = jsonDecode(userDataString);
-  //       String userId = userData['id_user'].toString();
-
-  //       await _fetchUnreadCount(userId);
-  //     }
-  //   });
-  // }
-
-  Future<void> _fetchSisaCuti(String userId) async {
-    try {
-      final response = await http.get(
-        Uri.parse("${AppConfig.apiUrl}/jatah-cuti/karyawan/$userId"),
-      );
-
-      if (response.statusCode == 200) {
-        final result = jsonDecode(response.body);
-        if (mounted) {
-          setState(() {
-            _sisaCuti = result['data']['sisa'] ?? 0;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint("Error sisa cuti: $e");
-    }
   }
 
   @override
@@ -118,42 +50,46 @@ class _DashboardPageState extends State<DashboardPage> {
     super.dispose();
   }
 
+  void _startClock() {
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() => _now = DateTime.now());
+    });
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    await FirebaseMessaging.instance
+        .requestPermission(alert: true, badge: true, sound: true);
+  }
+
   Future<void> _loadInitialData() async {
     final prefs = await SharedPreferences.getInstance();
     final userDataString = prefs.getString('user_data');
-    if (userDataString != null) {
-      final userData = jsonDecode(userDataString);
-      String userId = userData['id_user'].toString();
-      
-      setState(() {
-        _userName = userData['nama_user'] ?? "Karyawan";
-      });
+    if (userDataString == null) return;
 
-      await Future.wait([
-        _fetchTodayPresence(userId),
-        _fetchUnreadCount(userId),
-        _fetchJadwalInfo(),
-        _fetchSisaCuti(userId),
-      ]);
-    }
+    final userData = jsonDecode(userDataString);
+    final String userId = userData['id_user'].toString();
+    setState(() => _userName = userData['nama_user'] ?? "Karyawan");
+
+    await Future.wait([
+      _fetchTodayPresence(userId),
+      _fetchUnreadCount(userId),
+      _fetchJadwalInfo(),
+      _fetchSisaCuti(userId),
+    ]);
   }
-
-  String _displayMessage = "";
-  String _statusType = "work";
 
   Future<void> _fetchTodayPresence(String userId) async {
     try {
-      final response = await http.get(Uri.parse("${AppConfig.apiUrl}/presensi/today/$userId"));
-      if (response.statusCode == 200) {
+      final response = await http
+          .get(Uri.parse("${AppConfig.apiUrl}/presensi/today/$userId"));
+      if (response.statusCode == 200 && mounted) {
         final result = jsonDecode(response.body);
-        if (mounted) {
-          setState(() {
-            _statusType = result['status'];
-            _displayMessage = result['message'] ?? "";
-            _todayPresence = result['data'];
-            _isLoading = false;
-          });
-        }
+        setState(() {
+          _statusType = result['status'];
+          _displayMessage = result['message'] ?? "";
+          _todayPresence = result['data'];
+          _isLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
@@ -164,22 +100,16 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
-
       final response = await http.get(
         Uri.parse("${AppConfig.apiUrl}/notifications/unread-count/$userId"),
         headers: {
           "Authorization": "Bearer $token",
-          "Accept": "application/json"
+          "Accept": "application/json",
         },
       );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (mounted) {
-          setState(() {
-            _unreadCount = data['unread_count'] ?? 0;
-          });
-        }
+      if (response.statusCode == 200 && mounted) {
+        setState(() =>
+            _unreadCount = jsonDecode(response.body)['unread_count'] ?? 0);
       }
     } catch (e) {
       debugPrint("Error count: $e");
@@ -194,7 +124,6 @@ class _DashboardPageState extends State<DashboardPage> {
         http.get(Uri.parse("${AppConfig.apiUrl}/jatah-cuti/global")),
         http.get(Uri.parse("${AppConfig.apiUrl}/lokasi-presensi")),
       ]);
-
       if (mounted) {
         setState(() {
           _jamKerja = jsonDecode(responses[0].body);
@@ -203,7 +132,43 @@ class _DashboardPageState extends State<DashboardPage> {
           _lokasiSetting = jsonDecode(responses[3].body)['data'];
         });
       }
-    } catch (e) { debugPrint("Error fetch jadwal: $e"); }
+    } catch (e) {
+      debugPrint("Error fetch jadwal: $e");
+    }
+  }
+
+  Future<void> _fetchSisaCuti(String userId) async {
+    try {
+      final response = await http
+          .get(Uri.parse("${AppConfig.apiUrl}/jatah-cuti/karyawan/$userId"));
+      if (response.statusCode == 200 && mounted) {
+        setState(() =>
+            _sisaCuti = jsonDecode(response.body)['data']['sisa'] ?? 0);
+      }
+    } catch (e) {
+      debugPrint("Error sisa cuti: $e");
+    }
+  }
+
+  Future<void> _openNotification() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userDataString = prefs.getString('user_data');
+    if (userDataString == null || !mounted) return;
+
+    final String userId = jsonDecode(userDataString)['id_user'].toString();
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => NotificationPage(userId: userId)),
+    );
+    if (mounted) await _fetchUnreadCount(userId);
+  }
+
+  Future<void> _goToPresensi() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PresensiPage()),
+    );
+    if (result == true) _loadInitialData();
   }
 
   Future<void> _refreshData() async {
@@ -213,54 +178,39 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    bool hasCheckedIn = _todayPresence?['jam_masuk'] != null;
+    final bool hasCheckedIn = _todayPresence?['jam_masuk'] != null;
 
     final List<Widget> pages = [
-      _buildDashboardContent(hasCheckedIn),
+      DashboardContent(
+        now: _now,
+        hasCheckedIn: hasCheckedIn,
+        statusType: _statusType,
+        displayMessage: _displayMessage,
+        todayPresence: _todayPresence,
+        jamKerja: _jamKerja,
+        jatahCuti: _jatahCuti,
+        lokasiSetting: _lokasiSetting,
+        hariKerja: _hariKerja,
+        sisaCuti: _sisaCuti,
+        onScan: _goToPresensi,
+        onRefresh: _refreshData,
+      ),
       const RiwayatPage(),
       const ProfilePage(),
     ];
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      // UPDATE HEADER: Biru Primary
-      appBar: _currentIndex == 0 
-        ? AppBar(
-            backgroundColor: AppColors.primary,
-            elevation: 0,
-            toolbarHeight: 70,
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Selamat Datang", style: TextStyle(fontSize: 12, color: Colors.white70)),
-                Text(_userName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-              ],
-            ),
-            actions: [
-              IconButton(
-                icon: Stack(
-                  children: [
-                    const Icon(Icons.notifications_none, color: Colors.white, size: 28),
-                    if (_unreadCount > 0)
-                      Positioned(
-                        right: 0, top: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                          child: Text('$_unreadCount', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                        ),
-                      )
-                  ],
-                ),
-                onPressed: _openNotification,
-              ),
-              const SizedBox(width: 10),
-            ],
-          )
-        : null,
-      body: _isLoading 
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+      appBar: _currentIndex == 0
+          ? DashboardAppBar(
+              userName: _userName,
+              unreadCount: _unreadCount,
+              onNotificationTap: _openNotification,
+            )
+          : null,
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary))
           : IndexedStack(index: _currentIndex, children: pages),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -269,264 +219,18 @@ class _DashboardPageState extends State<DashboardPage> {
         unselectedItemColor: AppColors.grey,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: "Beranda"),
-          BottomNavigationBarItem(icon: Icon(Icons.assignment_outlined), activeIcon: Icon(Icons.assignment), label: "Riwayat"),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: "Profil"),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDashboardContent(bool hasCheckedIn) {
-    String currentTime = DateFormat('HH:mm').format(_now);
-    String currentDate = DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(_now);
-
-    List<dynamic> activeWorkDays = _hariKerja.where((h) {
-      var val = h['is_hari_kerja'];
-      return val == true || val == 1 || val == "1" || val == "true";
-    }).toList();
-
-    return AppRefreshWrapper(
-      onRefresh: _refreshData, 
-      color: AppColors.primary, 
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // CARD WAKTU
-            Container(
-              padding: const EdgeInsets.all(20),
-              width: double.infinity,
-              decoration: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))]),
-              child: Column(
-                children: [
-                  const Text("Waktu Sekarang", style: TextStyle(color: AppColors.grey)),
-                  Text(currentTime, style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: AppColors.primary, letterSpacing: 2)),
-                  Text(currentDate, style: const TextStyle(color: AppColors.grey)),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 25),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text("Status Presensi Hari Ini", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary)),
-                IconButton(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CalendarPage())),
-                  icon: const Icon(Icons.calendar_month_outlined, color: AppColors.primary),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            if (_statusType == 'success')
-              Row(
-                children: [
-                  _buildStatusCard("Check In", _todayPresence?['jam_masuk'] ?? "-- : --", _todayPresence?['lokasi'] ?? "-", _todayPresence?['jam_masuk'] != null, true),
-                  const SizedBox(width: 15),
-                  _buildStatusCard("Check Out", _todayPresence?['jam_pulang'] ?? "-- : --", _todayPresence?['lokasi'] ?? "-", _todayPresence?['jam_pulang'] != null, hasCheckedIn),
-                ],
-              )
-              else if (_statusType == 'leave')
-                _buildLeaveCard()
-              else
-                _buildEmptyStatusCard(),
-
-            const SizedBox(height: 25),
-            const Text("Ajukan Pengajuan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary)),
-            const SizedBox(height: 15),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(15)),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                    _buildMenuItem(Icons.edit_note, "Izin", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FormPengajuanPage(tipe: "Izin", idKategori: 1)))),
-                    _buildMenuItem(Icons.work_history, "Cuti", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FormPengajuanPage(tipe: "Cuti", idKategori: 2)))),
-                    _buildMenuItem(Icons.more_time, "Lembur", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FormPengajuanPage(tipe: "Lembur", idKategori: 3)))),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 25),
-            const Text("Informasi Penjadwalan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary)),
-            const SizedBox(height: 15),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(15)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildInfoSection("Kebijakan Cuti", [
-                    _buildStatRow("Jatah Cuti Tahunan", "${_jatahCuti?['jatah_tahunan_global'] ?? 0} Hari"),
-                    _buildStatRow("Sisa Jatah Cuti", "${_sisaCuti ?? 0} Hari"),
-                  ]),
-                  const Divider(height: 30),
-                  _buildInfoSection("Pengaturan Jam Kerja", [
-                    // _buildStatRow("Jam Masuk Utama", (_jamKerja?['jam_masuk'] ?? "--:--").toString().padRight(5).substring(0,5)),
-                    // _buildStatRow("Jam Pulang Utama", (_jamKerja?['jam_pulang'] ?? "--:--").toString().padRight(5).substring(0,5)),
-                    _buildStatRow("Mulai Absen Masuk", (_jamKerja?['mulai_absen_masuk'] ?? "--:--").toString().padRight(5).substring(0,5)),
-                    _buildStatRow("Batas Akhir Masuk", (_jamKerja?['akhir_absen_masuk'] ?? "--:--").toString().padRight(5).substring(0,5)),
-                    _buildStatRow("Mulai Absen Pulang", (_jamKerja?['mulai_absen_pulang'] ?? "--:--").toString().padRight(5).substring(0,5)),
-                    _buildStatRow("Batas Akhir Pulang", (_jamKerja?['akhir_absen_pulang'] ?? "--:--").toString().padRight(5).substring(0,5)),
-                  ]),
-                  const Divider(height: 30),
-                  _buildInfoSection("Hari Kerja", [
-                    _buildStatRow("Status", "${activeWorkDays.length} Hari/Minggu"),                  
-                    _buildStatRow("Hari", activeWorkDays.map((h) => h['nama_hari']).join(", ")),
-                  ]),
-                  const Divider(height: 30),
-                  _buildInfoSection("Radius Presensi", [
-                    _buildStatRow("Radius WFO", "${_lokasiSetting?['radius_wfo'] ?? 0} Meter"),
-                    _buildStatRow("Radius WFH", "${_lokasiSetting?['radius_wfh'] ?? 0} Meter"),
-                  ]),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyStatusCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _statusType == 'holiday' ? Colors.red.withValues(alpha: 0.05) : Colors.orange.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: _statusType == 'holiday' ? Colors.red.withValues(alpha: 0.3) : Colors.orange.withValues(alpha: 0.3))
-      ),
-      child: Column(
-        children: [
-          Icon(_statusType == 'holiday' ? Icons.celebration : Icons.event_busy, color: _statusType == 'holiday' ? Colors.red : Colors.orange, size: 40),
-          const SizedBox(height: 10),
-          Text(_statusType == 'holiday' ? "HARI LIBUR" : "TIDAK ADA JADWAL", style: TextStyle(fontWeight: FontWeight.bold, color: _statusType == 'holiday' ? Colors.red : Colors.orange)),
-          const SizedBox(height: 5),
-          Text(_displayMessage.isNotEmpty ? _displayMessage : "Hari ini Anda tidak dijadwalkan untuk presensi.", textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Colors.black54)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLeaveCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.blue.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        children: [
-          const Icon(Icons.event_available, color: Colors.blue, size: 40),
-          const SizedBox(height: 10),
-          const Text(
-            "SEDANG PENGAJUAN",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.blue,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            _displayMessage.isNotEmpty
-                ? _displayMessage
-                : "Anda tidak perlu melakukan presensi hari ini.",
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, color: Colors.black54),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusCard(String title, String time, String location, bool isDone, bool isEnabled) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: isDone ? AppColors.grey.withValues(alpha: 0.1) : AppColors.white,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: isDone ? Colors.transparent : AppColors.grey.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontSize: 12, color: AppColors.grey)),
-            const SizedBox(height: 5),
-            Text(time, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDone ? AppColors.primary : Colors.black)),
-            Text(location, style: const TextStyle(fontSize: 11, color: AppColors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 10),
-            if (isDone)
-              const Row(children: [Icon(Icons.check_circle, size: 16, color: AppColors.success), SizedBox(width: 5), Text("Selesai", style: TextStyle(fontSize: 12, color: AppColors.success))])
-            else
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: isEnabled ? () async {
-                    final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const PresensiPage()));
-                    if (result == true) _loadInitialData();
-                  } : null, 
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isEnabled ? AppColors.primary : Colors.grey[300],
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
-                  ),
-                  child: Text("Scan Sekarang", style: TextStyle(fontSize: 10, color: isEnabled ? AppColors.white : Colors.grey[600])),
-                ),
-              )
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMenuItem(IconData icon, String label, {VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            width: 60, height: 60,
-            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, color: AppColors.primary, size: 30),
-          ),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.primary)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoSection(String title, List<Widget> children) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
-        const SizedBox(height: 10),
-        ...children,
-      ],
-    );
-  }
-
-  Widget _buildStatRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(color: AppColors.grey, fontSize: 13)),
-          const SizedBox(width: 10),
-          Expanded(child: Text(value, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87, fontSize: 13))),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: "Beranda"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.assignment_outlined),
+              activeIcon: Icon(Icons.assignment),
+              label: "Riwayat"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: "Profil"),
         ],
       ),
     );
