@@ -37,7 +37,11 @@ class _PresensiPageState extends State<PresensiPage> {
 
   Interpreter? _interpreter;
   final FaceDetector _faceDetector = FaceDetector(
-    options: FaceDetectorOptions(performanceMode: FaceDetectorMode.accurate),
+    options: FaceDetectorOptions(
+      performanceMode: FaceDetectorMode.fast, 
+      enableClassification: true,             
+      enableLandmarks: true,                  
+    ),
   );
 
   @override

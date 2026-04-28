@@ -1,4 +1,5 @@
 import 'dart:convert';
+// import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -31,8 +32,52 @@ class _StepGeoWidgetState extends State<StepGeoWidget> {
   bool _loadingLocation = false;
   LatLng? _targetLocation;
 
+  Future<List<Position>> _collectSamples(
+    LocationSettings settings, {
+    int count = 4,
+    Duration interval = const Duration(milliseconds: 600),
+  }) async {
+    final samples = <Position>[];
+    for (int i = 0; i < count; i++) {
+      final p = await Geolocator.getCurrentPosition(
+        locationSettings: settings,
+      );
+      samples.add(p);
+      if (i < count - 1) await Future.delayed(interval);
+    }
+    return samples;
+  }
+
+  String? _detectFakeGps(List<Position> samples) {
+    final hasMock = samples.any((p) => p.isMocked);
+    if (hasMock) {
+      return "Terdeteksi Mock Location.";
+    }
+
+    for (int i = 1; i < samples.length; i++) {
+      final d = Geolocator.distanceBetween(
+        samples[i - 1].latitude,
+        samples[i - 1].longitude,
+        samples[i].latitude,
+        samples[i].longitude,
+      );
+
+      if (d > 100) {
+        return "Pergerakan GPS tidak wajar (${d.toStringAsFixed(0)} m).";
+      }
+    }
+
+    final badAccuracy = samples.every((p) => p.accuracy > 100);
+    if (badAccuracy) {
+      return "Sinyal GPS lemah. Pindah ke area terbuka.";
+    }
+
+    return null;
+  }
+
   Future<void> _checkLocation() async {
     setState(() => _loadingLocation = true);
+
     final bool allowed = await _checkLocationPermission();
     if (!allowed) {
       setState(() => _loadingLocation = false);
@@ -45,35 +90,43 @@ class _StepGeoWidgetState extends State<StepGeoWidget> {
         distanceFilter: 0,
       );
 
-      Position? finePosition;
-      for (int i = 0; i < 3; i++) {
-        final Position p = await Geolocator.getCurrentPosition(
-          locationSettings: locationSettings,
-        );
-        finePosition = p;
-        if (p.accuracy < 20) break;
-        await Future.delayed(const Duration(milliseconds: 500));
+      final samples = await _collectSamples(locationSettings);
+
+      final fakeReason = _detectFakeGps(samples);
+      if (fakeReason != null) {
+        if (mounted) {
+          setState(() => _loadingLocation = false);
+          AppDialog.show(
+            context,
+            message: "⚠️ Fake GPS Terdeteksi\n\n$fakeReason",
+          );
+        }
+        return;
       }
 
-      if (finePosition == null) {
-        throw "Tidak dapat mendapatkan sinyal GPS yang akurat.";
-      }
+      final finePosition = samples.reduce(
+        (a, b) => a.accuracy <= b.accuracy ? a : b,
+      );
 
       double targetLat;
       double targetLng;
       double limit;
 
       if (widget.modeId == 1) {
-        // WFO — gunakan koordinat kantor
-        targetLat = double.parse(widget.config['latitude_kantor'].toString());
-        targetLng = double.parse(widget.config['longitude_kantor'].toString());
+        // WFO — koordinat kantor
+        targetLat =
+            double.parse(widget.config['latitude_kantor'].toString());
+        targetLng =
+            double.parse(widget.config['longitude_kantor'].toString());
         limit = double.parse(widget.config['radius_wfo'].toString());
       } else {
-        // WFH — gunakan koordinat rumah dari user data
+        // WFH — koordinat rumah dari user data
         final prefs = await SharedPreferences.getInstance();
         final user = jsonDecode(prefs.getString('user_data') ?? '{}');
-        targetLat = double.parse(user['latitude_rumah']?.toString() ?? '0');
-        targetLng = double.parse(user['longitude_rumah']?.toString() ?? '0');
+        targetLat =
+            double.parse(user['latitude_rumah']?.toString() ?? '0');
+        targetLng =
+            double.parse(user['longitude_rumah']?.toString() ?? '0');
         limit = double.parse(widget.config['radius_wfh'].toString());
       }
 
@@ -144,16 +197,25 @@ class _StepGeoWidgetState extends State<StepGeoWidget> {
 
   String get _targetLabel => widget.modeId == 1 ? 'Kantor' : 'Rumah';
 
+  String get _buttonLabel {
+    if (_pos == null) return "LACAK LOKASI";
+    if (widget.modeId == 3) return "LANJUT VERIFIKASI";
+    return _isValid ? "LANJUT VERIFIKASI" : "DI LUAR RADIUS";
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         Expanded(
           child: _pos == null
-              ? const Center(child: Text("Klik tombol untuk melacak lokasi"))
+              ? const Center(
+                  child: Text("Klik tombol untuk melacak lokasi"),
+                )
               : FlutterMap(
                   options: MapOptions(
-                    initialCenter: LatLng(_pos!.latitude, _pos!.longitude),
+                    initialCenter:
+                        LatLng(_pos!.latitude, _pos!.longitude),
                     initialZoom: 16,
                   ),
                   children: [
@@ -165,14 +227,20 @@ class _StepGeoWidgetState extends State<StepGeoWidget> {
                     MarkerLayer(markers: [
                       Marker(
                         point: LatLng(_pos!.latitude, _pos!.longitude),
-                        child: const Icon(Icons.person_pin_circle,
-                            color: Colors.blue, size: 40),
+                        child: const Icon(
+                          Icons.person_pin_circle,
+                          color: Colors.blue,
+                          size: 40,
+                        ),
                       ),
                       if (_targetLocation != null)
                         Marker(
                           point: _targetLocation!,
-                          child: const Icon(Icons.location_on,
-                              color: Colors.red, size: 40),
+                          child: const Icon(
+                            Icons.location_on,
+                            color: Colors.red,
+                            size: 40,
+                          ),
                         ),
                     ]),
                     if (widget.modeId != 3 && _targetLocation != null)
@@ -194,11 +262,20 @@ class _StepGeoWidgetState extends State<StepGeoWidget> {
           color: Colors.white,
           child: Column(
             children: [
-              if (_pos != null)
+              if (_pos != null) ...[
                 Text(
                   "Jarak ke $_targetLabel: ${_dist.toStringAsFixed(0)} meter",
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
+                const SizedBox(height: 4),
+                // Text(
+                //   "Akurasi GPS: ±${_pos!.accuracy.toStringAsFixed(0)} meter",
+                //   style: const TextStyle(
+                //     color: Colors.grey,
+                //     fontSize: 12,
+                //   ),
+                // ),
+              ],
               const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
@@ -208,17 +285,42 @@ class _StepGeoWidgetState extends State<StepGeoWidget> {
                       ? null
                       : (_pos == null
                           ? _checkLocation
-                          : (_isValid ? () => widget.onResult(_pos!) : null)),
+                          : (_isValid
+                              ? () => widget.onResult(_pos!)
+                              : null)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        _isValid || _pos == null ? AppColors.primary : Colors.grey,
+                    backgroundColor: _isValid || _pos == null
+                        ? AppColors.primary
+                        : Colors.grey,
                   ),
                   child: _loadingLocation
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : Text(
+                      ? const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                            SizedBox(width: 10),
+                            Text(
+                              "Memverifikasi lokasi...",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        )
+                            : Text(
                           _buttonLabel,
                           style: const TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.bold),
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                 ),
               ),
@@ -227,11 +329,5 @@ class _StepGeoWidgetState extends State<StepGeoWidget> {
         ),
       ],
     );
-  }
-
-  String get _buttonLabel {
-    if (_pos == null) return "LACAK LOKASI";
-    if (widget.modeId == 3) return "LANJUT VERIFIKASI";
-    return _isValid ? "LANJUT VERIFIKASI" : "DI LUAR RADIUS";
   }
 }

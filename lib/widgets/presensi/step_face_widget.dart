@@ -1,4 +1,5 @@
 import 'dart:io';
+// import 'dart:ui';
 import 'dart:math' as math;
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -8,9 +9,19 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../../shared/theme.dart';
+// import '../../shared/theme.dart';
 import '../../services/user_service.dart';
 import '../../widgets/app_dialog.dart';
+// import 'dart:typed_data';
+// import 'package:flutter/foundation.dart';
+
+enum LivenessStep {
+  none,
+  blink,
+  smile,
+  turnHead,
+  done,
+}
 
 class StepFaceWidget extends StatefulWidget {
   final FaceDetector faceDetector;
@@ -32,6 +43,10 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
   CameraController? _camera;
   bool _isProcessing = false;
 
+  LivenessStep _currentStep = LivenessStep.none;
+
+  bool _wasEyeOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -45,40 +60,157 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
   }
 
   Future<void> _initCamera() async {
-    final bool allowed = await _checkCameraPermission();
+    final allowed = await _checkCameraPermission();
     if (!allowed) return;
+
     final cams = await availableCameras();
-    _camera = CameraController(cams[1], ResolutionPreset.high, enableAudio: false);
+    _camera = CameraController(
+      cams.firstWhere((c) => c.lensDirection == CameraLensDirection.front),
+      ResolutionPreset.medium,
+      enableAudio: false,
+    );
+
     await _camera!.initialize();
+
+    _startDetectionLoop();
+
     if (mounted) setState(() {});
+  }
+
+  void _processLiveness(Face face) {
+    final leftEye = face.leftEyeOpenProbability ?? 1.0;
+    final rightEye = face.rightEyeOpenProbability ?? 1.0;
+    final smile = face.smilingProbability ?? 0.0;
+    final headY = face.headEulerAngleY ?? 0.0;
+    debugPrint("LeftEye: $leftEye | RightEye: $rightEye | Smile: $smile | HeadY: $headY");
+    debugPrint("STEP: $_currentStep");
+
+    bool isEyeOpen = leftEye > 0.4 && rightEye > 0.4;
+    bool isEyeClosed = leftEye < 0.4 && rightEye < 0.4;
+
+    switch (_currentStep) {
+      case LivenessStep.none:
+        if (isEyeOpen) {
+          _wasEyeOpen = true;
+          _currentStep = LivenessStep.blink;
+        }
+        break;
+
+      case LivenessStep.blink:
+        if (_wasEyeOpen && isEyeClosed) {
+          _currentStep = LivenessStep.smile;
+        }
+        break;
+
+      case LivenessStep.smile:
+        if (smile > 0.6) {
+          _currentStep = LivenessStep.turnHead;
+        }
+        break;
+
+      case LivenessStep.turnHead:
+        if (headY > 12 || headY < -12) {
+          _currentStep = LivenessStep.done;
+        }
+        break;
+
+      case LivenessStep.done:
+        break;
+    }
+
+    if (mounted) setState(() {});
+  }
+
+  String get instruction {
+    switch (_currentStep) {
+      case LivenessStep.none:
+        return "Arahkan wajah ke kamera";
+      case LivenessStep.blink:
+        return "Kedipkan mata";
+      case LivenessStep.smile:
+        return "Tersenyum";
+      case LivenessStep.turnHead:
+        return "Putar kepala";
+      case LivenessStep.done:
+        return "Memproses...";
+    }
+  }
+
+  Future<void> _verifyFace(XFile photo, Face face) async {
+    try {
+      await UserService.refreshUserData();
+
+      final prefs = await SharedPreferences.getInstance();
+      final userDataStr = prefs.getString('user_data');
+
+      if (userDataStr == null) throw "User tidak ditemukan";
+
+      final user = jsonDecode(userDataStr);
+      final vectorData = user['embedding_vector'];
+
+      List<double> registered = _parseVector(vectorData);
+
+      List<double> current =
+          _extract(File(photo.path), face);
+
+      final score = _cosineDistance(registered, current);
+
+      if (score > 0.70) {
+        widget.onResult(photo);
+      } else {
+        throw "Wajah tidak cocok";
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppDialog.show(context, message: e.toString());
+    }
+  }
+
+  List<double> _parseVector(dynamic vectorData) {
+    if (vectorData is List) {
+      return vectorData.map((e) => double.parse(e.toString())).toList();
+    } else if (vectorData is String) {
+      return vectorData
+          .replaceAll('{', '')   
+          .replaceAll('}', '')   
+          .replaceAll('[', '')
+          .replaceAll(']', '')
+          .split(',')
+          .map((e) => double.parse(e.trim()))
+          .toList();
+    } else {
+      throw "Format embedding tidak valid";
+    }
   }
 
   List<double> _extract(File file, Face face) {
     final image = img.decodeImage(file.readAsBytesSync())!;
 
-    final int x = face.boundingBox.left.toInt().clamp(0, image.width - 1);
-    final int y = face.boundingBox.top.toInt().clamp(0, image.height - 1);
-    final int w = face.boundingBox.width.toInt().clamp(0, image.width - x);
-    final int h = face.boundingBox.height.toInt().clamp(0, image.height - y);
+    final crop = img.copyCrop(
+      image,
+      x: face.boundingBox.left.toInt(),
+      y: face.boundingBox.top.toInt(),
+      width: face.boundingBox.width.toInt(),
+      height: face.boundingBox.height.toInt(),
+    );
 
-    final crop = img.copyCrop(image, x: x, y: y, width: w, height: h);
     final resized = img.copyResize(crop, width: 112, height: 112);
 
     final input = [
-      List.generate(112, (iy) => List.generate(112, (ix) {
-            final p = resized.getPixel(ix, iy);
-            return [p.r / 255.0, p.g / 255.0, p.b / 255.0];
+      List.generate(112, (y) => List.generate(112, (x) {
+            final p = resized.getPixel(x, y);
+            return [p.r / 255, p.g / 255, p.b / 255];
           }))
     ];
 
-    final out = List.filled(1 * 192, 0.0).reshape([1, 192]);
-    widget.interpreter.run(input, out);
+    final output = List.filled(1 * 192, 0.0).reshape([1, 192]);
 
-    List<double> emb = List<double>.from(out[0]);
-    final double norm = math.sqrt(emb.fold(0, (sum, e) => sum + e * e));
-    emb = emb.map((e) => e / norm).toList();
+    widget.interpreter.run(input, output);
 
-    return emb;
+    List<double> emb = List<double>.from(output[0]);
+
+    final norm = math.sqrt(emb.fold(0, (s, e) => s + e * e));
+    return emb.map((e) => e / norm).toList();
   }
 
   double _cosineDistance(List<double> e1, List<double> e2) {
@@ -91,103 +223,48 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
     return dot / (math.sqrt(n1) * math.sqrt(n2));
   }
 
-  Future<void> _processCapture() async {
-    setState(() => _isProcessing = true);
+Future<void> _startDetectionLoop() async {
+  while (_camera != null && _camera!.value.isInitialized) {
+    if (_isProcessing) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      continue;
+    }
+
+    _isProcessing = true;
+
     try {
       final photo = await _camera!.takePicture();
-      final faces = await widget.faceDetector
-          .processImage(InputImage.fromFile(File(photo.path)));
 
-      if (faces.isEmpty) throw "Wajah tidak ditemukan!";
+      final inputImage = InputImage.fromFilePath(photo.path);
 
-      await UserService.refreshUserData();
-      final prefs = await SharedPreferences.getInstance();
-      final userDataStr = prefs.getString('user_data');
-      if (userDataStr == null) throw "Sesi user tidak ditemukan";
+      final faces =
+          await widget.faceDetector.processImage(inputImage);
 
-      final user = jsonDecode(userDataStr);
-      final vectorData = user['embedding_vector'];
-      if (vectorData == null) throw "Data wajah belum terdaftar di profil.";
+      debugPrint("Faces detected: ${faces.length}");
 
-      List<double> registered;
-      try {
-        if (vectorData is List) {
-          registered = vectorData.map((item) => double.parse(item.toString())).toList();
-        } else if (vectorData is Map) {
-          registered = vectorData.values
-              .map((item) => double.parse(item.toString()))
-              .toList();
-        } else if (vectorData is String) {
-          final cleanString = vectorData
-              .replaceAll('{', '')
-              .replaceAll('}', '')
-              .replaceAll('[', '')
-              .replaceAll(']', '');
-          registered = cleanString
-              .split(',')
-              .where((s) => s.trim().isNotEmpty)
-              .map((e) => double.parse(e.trim()))
-              .toList();
-        } else {
-          throw "Format data wajah (${vectorData.runtimeType}) tidak dikenal";
+      if (faces.isNotEmpty) {
+        final face = faces.first;
+
+        _processLiveness(face);
+
+        if (_currentStep == LivenessStep.done) {
+          await _verifyFace(photo, face);
+          break;
         }
-      } catch (e) {
-        throw "Gagal membaca data wajah: $e";
-      }
-
-      List<double> current = _extract(File(photo.path), faces.first);
-      final double norm = math.sqrt(current.fold(0, (sum, e) => sum + e * e));
-      current = current.map((e) => e / norm).toList();
-
-      final double score = _cosineDistance(registered, current);
-
-      if (score > 0.70) {
-        widget.onResult(photo);
-      } else {
-        throw "Verifikasi gagal. Wajah Anda tidak match dengan profil Anda";
       }
     } catch (e) {
-      if (!mounted) return;
-      AppDialog.show(context, message: e.toString());
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
+      debugPrint("Loop error: $e");
     }
+
+    _isProcessing = false;
+
+    await Future.delayed(const Duration(milliseconds: 500));
   }
+}
 
   Future<bool> _checkCameraPermission() async {
-    var status = await Permission.camera.status;
-    if (status.isGranted) return true;
-    if (status.isDenied) {
-      status = await Permission.camera.request();
-      return status.isGranted;
-    }
-    if (status.isPermanentlyDenied) {
-      _showPermissionDialog(
-        "Izin Kamera Dibutuhkan",
-        "Untuk melakukan scan wajah Anda harus mengaktifkan izin kamera terlebih dahulu di pengaturan.",
-      );
-    }
-    return false;
-  }
-
-  void _showPermissionDialog(String title, String message) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            child: const Text("Nanti Saja"),
-            onPressed: () => Navigator.pop(context),
-          ),
-          ElevatedButton(
-            onPressed: openAppSettings,
-            child: const Text("Pengaturan"),
-          ),
-        ],
-      ),
-    );
+    var status = await Permission.camera.request();
+    return status.isGranted;
   }
 
   @override
@@ -198,96 +275,20 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
 
     return Stack(
       children: [
-        Positioned.fill(
-          child: AspectRatio(
-            aspectRatio: _camera!.value.aspectRatio,
-            child: CameraPreview(_camera!),
-          ),
-        ),
-        // Overlay gelap dengan lubang oval
-        ColorFiltered(
-          colorFilter: ColorFilter.mode(
-              Colors.black.withValues(alpha: 0.7), BlendMode.srcOut),
-          child: Stack(
-            children: [
-              Container(
-                  decoration: const BoxDecoration(
-                      color: Colors.black,
-                      backgroundBlendMode: BlendMode.dstOut)),
-              Align(
-                alignment: Alignment.center,
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 100),
-                  height: 280,
-                  width: 280,
-                  decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(140)),
-                ),
-              ),
-            ],
-          ),
-        ),
-        // Border lingkaran
+        CameraPreview(_camera!),
+
         Align(
-          alignment: Alignment.center,
+          alignment: Alignment.topCenter,
           child: Container(
-            margin: const EdgeInsets.only(bottom: 100),
-            height: 285,
-            width: 285,
+            margin: const EdgeInsets.only(top: 80),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              border: Border.all(color: AppColors.primary, width: 4),
-              borderRadius: BorderRadius.circular(150),
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(10),
             ),
-          ),
-        ),
-        // Tombol bawah
-        Align(
-          alignment: Alignment.bottomCenter,
-          child: Container(
-            padding: const EdgeInsets.all(25),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(30),
-                topRight: Radius.circular(30),
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  "Face Recognition",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: ElevatedButton.icon(
-                    onPressed: _isProcessing ? null : _processCapture,
-                    icon: _isProcessing
-                        ? const SizedBox.shrink()
-                        : const Icon(Icons.face_unlock_outlined,
-                            color: Colors.white),
-                    label: _isProcessing
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text("SCAN WAJAH SEKARANG",
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15)),
-                    ),
-                  ),
-                ),
-              ],
+            child: Text(
+              instruction,
+              style: const TextStyle(color: Colors.white),
             ),
           ),
         ),

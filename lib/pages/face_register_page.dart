@@ -28,7 +28,12 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
   bool _isReady = false;
   bool _isProcessing = false;
   final FaceDetector _faceDetector = FaceDetector(
-      options: FaceDetectorOptions(performanceMode: FaceDetectorMode.accurate));
+    options: FaceDetectorOptions(
+      performanceMode: FaceDetectorMode.fast, 
+      enableClassification: true,
+      enableLandmarks: true, 
+    ),
+  );
 
   @override
   void initState() {
@@ -38,7 +43,13 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
 
   Future<void> _initScanner() async {
     final cameras = await availableCameras();
-    _controller = CameraController(cameras[1], ResolutionPreset.high);
+    _controller = CameraController(
+      cameras.firstWhere(
+        (c) => c.lensDirection == CameraLensDirection.front,
+        orElse: () => cameras.first,
+      ),
+      ResolutionPreset.high,
+    );
     await _controller.initialize();
     _interpreter = await Interpreter.fromAsset('assets/models/mobilefacenet.tflite');
     if (mounted) setState(() => _isReady = true);
