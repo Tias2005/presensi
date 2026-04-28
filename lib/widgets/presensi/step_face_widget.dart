@@ -42,10 +42,10 @@ class StepFaceWidget extends StatefulWidget {
 class _StepFaceWidgetState extends State<StepFaceWidget> {
   CameraController? _camera;
   bool _isProcessing = false;
-
+  bool _isSuccess = false;
   LivenessStep _currentStep = LivenessStep.none;
-
   bool _wasEyeOpen = false;
+  int get totalSteps => 4;
 
   @override
   void initState() {
@@ -122,18 +122,27 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
   }
 
   String get instruction {
+    String text;
+
     switch (_currentStep) {
       case LivenessStep.none:
-        return "Arahkan wajah ke kamera";
+        text = "Arahkan wajah ke kamera";
+        break;
       case LivenessStep.blink:
-        return "Kedipkan mata";
+        text = "Kedipkan mata";
+        break;
       case LivenessStep.smile:
-        return "Tersenyum";
+        text = "Tersenyum";
+        break;
       case LivenessStep.turnHead:
-        return "Putar kepala";
+        text = "Putar kepala";
+        break;
       case LivenessStep.done:
-        return "Memproses...";
+        text = "Memproses...";
+        break;
     }
+
+    return "Step $currentStepIndex/$totalSteps\n$text";
   }
 
   Future<void> _verifyFace(XFile photo, Face face) async {
@@ -156,9 +165,10 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
       final score = _cosineDistance(registered, current);
 
       if (score > 0.70) {
+        _isSuccess = true;
         widget.onResult(photo);
       } else {
-        throw "Wajah tidak cocok";
+        throw "Wajah tidak cocok, silakan ulangi scan";
       }
     } catch (e) {
       if (!mounted) return;
@@ -247,11 +257,13 @@ Future<void> _startDetectionLoop() async {
 
         _processLiveness(face);
 
-        if (_currentStep == LivenessStep.done) {
-          await _verifyFace(photo, face);
+      if (_currentStep == LivenessStep.done) {
+        await _verifyFace(photo, face);
+
+        if (_isSuccess) {
           break;
         }
-      }
+      }}
     } catch (e) {
       debugPrint("Loop error: $e");
     }
@@ -267,6 +279,22 @@ Future<void> _startDetectionLoop() async {
     return status.isGranted;
   }
 
+  int get currentStepIndex {
+    switch (_currentStep) {
+      case LivenessStep.none:
+        return 1;
+      case LivenessStep.blink:
+        return 2;
+      case LivenessStep.smile:
+        return 3;
+      case LivenessStep.turnHead:
+        return 4;
+      case LivenessStep.done:
+        return 4;
+    }
+  }
+  
+
   @override
   Widget build(BuildContext context) {
     if (_camera == null || !_camera!.value.isInitialized) {
@@ -277,6 +305,8 @@ Future<void> _startDetectionLoop() async {
       children: [
         CameraPreview(_camera!),
 
+        const FaceGuideOverlay(),
+
         Align(
           alignment: Alignment.topCenter,
           child: Container(
@@ -286,13 +316,82 @@ Future<void> _startDetectionLoop() async {
               color: Colors.black54,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text(
-              instruction,
-              style: const TextStyle(color: Colors.white),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Progress bar
+                SizedBox(
+                  width: 200,
+                  child: LinearProgressIndicator(
+                    value: currentStepIndex / totalSteps,
+                    backgroundColor: Colors.white24,
+                    valueColor: const AlwaysStoppedAnimation(Colors.green),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Text
+                Text(
+                  instruction,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ],
             ),
           ),
         ),
       ],
     );
   }
+}
+
+class FaceGuideOverlay extends StatelessWidget {
+  const FaceGuideOverlay({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: CustomPaint(
+        size: MediaQuery.of(context).size,
+        painter: _FaceGuidePainter(),
+      ),
+    );
+  }
+}
+
+class _FaceGuidePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final overlayColor = Colors.black.withValues(alpha: 0.6);
+
+    final paint = Paint()
+      ..color = overlayColor
+      ..style = PaintingStyle.fill;
+
+    final path = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width * 0.35;
+
+    final circlePath = Path()
+      ..addOval(Rect.fromCircle(center: center, radius: radius));
+
+    final finalPath = Path.combine(
+      PathOperation.difference,
+      path,
+      circlePath,
+    );
+
+    canvas.drawPath(finalPath, paint);
+
+    final borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+
+    canvas.drawCircle(center, radius, borderPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
