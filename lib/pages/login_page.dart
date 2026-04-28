@@ -51,17 +51,19 @@ class _LoginPageState extends State<LoginPage> {
 
       final fcmToken = await FirebaseMessaging.instance.getToken();
 
-      await http.post(
-        Uri.parse('${AppConfig.apiUrl}/save-fcm-token'),
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer ${data['token']}',
-        },
-        body: {
-          'id_user': data['user']['id_user'],
-          'fcm_token': fcmToken ?? '',
-        },
-      );
+      if (fcmToken != null) {
+        await http.post(
+          Uri.parse('${AppConfig.apiUrl}/save-fcm-token'),
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer ${data['token']}',
+          },
+          body: {
+            'id_user': data['user']['id_user'],
+            'fcm_token': fcmToken,
+          },
+        );
+      }
 
       if (!mounted) return;
 

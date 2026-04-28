@@ -8,6 +8,9 @@ import 'pages/dashboard_page.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'dart:developer' as dev;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:presensi/config.dart';
 
 late List<CameraDescription> cameras;
 
@@ -23,7 +26,32 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
   Future<void> main() async {
     WidgetsFlutterBinding.ensureInitialized();
 
-    await Firebase.initializeApp();
+  await Firebase.initializeApp();
+
+  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userDataString = prefs.getString('user_data');
+
+    if (userDataString == null) return;
+
+    final userData = jsonDecode(userDataString);
+
+    try {
+      await http.post(
+        Uri.parse('${AppConfig.apiUrl}/save-fcm-token'),
+        headers: {'Accept': 'application/json'},
+        body: {
+          'id_user': userData['id_user'],
+          'fcm_token': newToken,
+        },
+      );
+
+      dev.log("FCM token updated", name: "FCM");
+    } catch (e) {
+      dev.log("FCM refresh error: $e", name: "FCM");
+    }
+  });
+
 
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
