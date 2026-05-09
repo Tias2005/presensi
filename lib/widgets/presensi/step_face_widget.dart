@@ -1,5 +1,4 @@
 import 'dart:io';
-// import 'dart:ui';
 import 'dart:math' as math;
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -9,11 +8,8 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
-// import '../../shared/theme.dart';
 import '../../services/user_service.dart';
 import '../../widgets/app_dialog.dart';
-// import 'dart:typed_data';
-// import 'package:flutter/foundation.dart';
 
 enum LivenessStep {
   none,
@@ -44,7 +40,6 @@ class StepFaceWidget extends StatefulWidget {
 class _StepFaceWidgetState extends State<StepFaceWidget> {
   CameraController? _camera;
   bool _isProcessing = false;
-  bool _isSuccess = false;
   
   List<LivenessStep> _steps = []; 
   int _currentStepIndex = 0; 
@@ -53,6 +48,7 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
   bool _wasEyeOpen = false;
   bool _isActive = true;
   int get totalSteps => 4; 
+  bool _readyToCapture = false;
 
   @override
   void initState() {
@@ -91,17 +87,21 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
     if (!allowed) return;
 
     final cams = await availableCameras();
+    if (cams.isEmpty) return;
+
     _camera = CameraController(
       cams.firstWhere((c) => c.lensDirection == CameraLensDirection.front),
       ResolutionPreset.medium,
       enableAudio: false,
     );
 
-    await _camera!.initialize();
-
-    _startDetectionLoop();
-
-    if (mounted) setState(() {});
+    try {
+      await _camera!.initialize();
+      _startDetectionLoop();
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint("Camera Init Error: $e");
+    }
   }
 
   void _processLiveness(Face face) {
@@ -122,25 +122,21 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
           stepCompleted = true;
         }
         break;
-
       case LivenessStep.blink:
         if (_wasEyeOpen && isEyeClosed) {
           stepCompleted = true;
         }
         break;
-
       case LivenessStep.smile:
         if (smile > 0.6) {
           stepCompleted = true;
         }
         break;
-
       case LivenessStep.turnHead:
         if (headY > 12 || headY < -12) {
           stepCompleted = true;
         }
         break;
-
       case LivenessStep.done:
         break;
     }
@@ -149,33 +145,34 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
       setState(() {
         _currentStepIndex++;
         _wasEyeOpen = isEyeOpen; 
+        if (_currentStep == LivenessStep.done) {
+          _readyToCapture = true; 
+        }
       });
     }
   }
 
   String get instruction {
-      String text;
-      switch (_currentStep) {
-        case LivenessStep.none:
-          text = "Arahkan wajah ke kamera";
-          break;
-        case LivenessStep.blink:
-          text = "Kedipkan mata";
-          break;
-        case LivenessStep.smile:
-          text = "Tersenyum";
-          break;
-        case LivenessStep.turnHead:
-          text = "Putar kepala";
-          break;
-        case LivenessStep.done:
-          text = "Memproses...";
-          break;
-      }
-      return "Step ${_currentStepIndex + 1}/$totalSteps\n$text";
+    String text;
+    switch (_currentStep) {
+      case LivenessStep.none:
+        text = "Arahkan wajah ke kamera";
+        break;
+      case LivenessStep.blink:
+        text = "Kedipkan mata";
+        break;
+      case LivenessStep.smile:
+        text = "Tersenyum";
+        break;
+      case LivenessStep.turnHead:
+        text = "Putar kepala";
+        break;
+      case LivenessStep.done:
+        text = "Liveness Berhasil!";
+        break;
     }
-
-    int get currentStepUIIndex => _currentStepIndex + 1;
+    return "Step ${_currentStepIndex + 1}/$totalSteps\n$text";
+  }
 
   Future<void> _verifyFace(XFile photo, Face face) async {
     try {
@@ -190,35 +187,30 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
       final vectorData = user['embedding_vector'];
 
       List<double> registered = _parseVector(vectorData);
-
-      List<double> current =
-          _extract(File(photo.path), face);
+      List<double> current = _extract(File(photo.path), face);
 
       final score = _cosineDistance(registered, current);
 
       if (score > 0.60) {
-        _isSuccess = true;
-
-          _isActive = false;
-          _camera?.dispose();
-
+        _isActive = false;
+        await _camera?.dispose();
         widget.onResult(photo);
       } else {
-              if (!mounted) return;
-
-              AppDialog.show(
-                context,
-                message: "Wajah tidak cocok, silakan ulangi scan",
-                onOk: () {
-                  _generateRandomSteps(); 
-                  setState(() {
-                    _wasEyeOpen = false;
-                    _isProcessing = false;
-                    _isSuccess = false;
-                  });
-                },
-              );
-            }
+        if (!mounted) return;
+        AppDialog.show(
+          context,
+          message: "Wajah tidak cocok, silakan ulangi scan",
+          onOk: () {
+            if (!mounted) return;
+            _generateRandomSteps(); 
+            setState(() {
+              _wasEyeOpen = false;
+              _isProcessing = false;
+              _readyToCapture = false;
+            });
+          },
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       AppDialog.show(context, message: e.toString());
@@ -230,10 +222,7 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
       return vectorData.map((e) => double.parse(e.toString())).toList();
     } else if (vectorData is String) {
       return vectorData
-          .replaceAll('{', '')   
-          .replaceAll('}', '')   
-          .replaceAll('[', '')
-          .replaceAll(']', '')
+          .replaceAll(RegExp(r'[\[\]{}]'), '')
           .split(',')
           .map((e) => double.parse(e.trim()))
           .toList();
@@ -243,7 +232,8 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
   }
 
   List<double> _extract(File file, Face face) {
-    final image = img.decodeImage(file.readAsBytesSync())!;
+    final bytes = file.readAsBytesSync();
+    final image = img.decodeImage(bytes)!;
 
     final crop = img.copyCrop(
       image,
@@ -263,11 +253,9 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
     ];
 
     final output = List.filled(1 * 192, 0.0).reshape([1, 192]);
-
     widget.interpreter.run(input, output);
 
     List<double> emb = List<double>.from(output[0]);
-
     final norm = math.sqrt(emb.fold(0, (s, e) => s + e * e));
     return emb.map((e) => e / norm).toList();
   }
@@ -282,67 +270,73 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
     return dot / (math.sqrt(n1) * math.sqrt(n2));
   }
 
-Future<void> _startDetectionLoop() async {
-  while (_isActive && _camera != null && _camera!.value.isInitialized) {
-    if (_isProcessing) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      continue;
-    }
+  Future<void> _startDetectionLoop() async {
+    while (_isActive && _camera != null && _camera!.value.isInitialized) {
+      if (_isProcessing || _readyToCapture) { 
+        await Future.delayed(const Duration(milliseconds: 300));
+        continue;
+      }
 
-    _isProcessing = true;
+      _isProcessing = true;
+      try {
+        final photo = await _camera!.takePicture();
+        if (!mounted) return;
+
+        final inputImage = InputImage.fromFilePath(photo.path);
+        final faces = await widget.faceDetector.processImage(inputImage);
+
+        if (faces.isNotEmpty) {
+          _processLiveness(faces.first);
+        }
+      } catch (e) {
+        debugPrint("Loop error: $e");
+      }
+      
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+  }
+
+  Future<void> _handleManualCapture() async {
+    if (_camera == null || _isProcessing) return;
+
+    setState(() => _isProcessing = true);
 
     try {
       final photo = await _camera!.takePicture();
+      if (!mounted) return;
 
       final inputImage = InputImage.fromFilePath(photo.path);
+      final faces = await widget.faceDetector.processImage(inputImage);
 
-      final faces =
-          await widget.faceDetector.processImage(inputImage);
+      if (faces.isEmpty) {
+        throw "Wajah tidak terdeteksi, posisikan wajah dengan benar.";
+      }
 
-      debugPrint("Faces detected: ${faces.length}");
-
-      if (faces.isNotEmpty) {
-        final face = faces.first;
-
-        _processLiveness(face);
-
-      if (_currentStep == LivenessStep.done) {
-        await _verifyFace(photo, face);
-
-        if (_isSuccess) {
-          break;
-        }
-      }}
+      await _verifyFace(photo, faces.first);
     } catch (e) {
-      debugPrint("Loop error: $e");
+      if (mounted) AppDialog.show(context, message: e.toString());
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
     }
-
-    _isProcessing = false;
-
-    await Future.delayed(const Duration(milliseconds: 500));
   }
-}
-
+  
   Future<bool> _checkCameraPermission() async {
     var status = await Permission.camera.request();
     return status.isGranted;
   }
 
-  int get currentStepIndex {
+  int get currentStepUIIndex {
     switch (_currentStep) {
-      case LivenessStep.none:
-        return 1;
-      case LivenessStep.blink:
-        return 2;
-      case LivenessStep.smile:
-        return 3;
-      case LivenessStep.turnHead:
-        return 4;
-      case LivenessStep.done:
-        return 4;
+      case LivenessStep.none: return 1;
+      case LivenessStep.blink: return 2;
+      case LivenessStep.smile: return 3;
+      case LivenessStep.turnHead: return 4;
+      case LivenessStep.done: return 4;
     }
   }
-  
 
   @override
   Widget build(BuildContext context) {
@@ -353,7 +347,6 @@ Future<void> _startDetectionLoop() async {
     return Stack(
       children: [
         CameraPreview(_camera!),
-
         const FaceGuideOverlay(),
 
         Align(
@@ -368,20 +361,17 @@ Future<void> _startDetectionLoop() async {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Progress bar
                 SizedBox(
                   width: 200,
                   child: LinearProgressIndicator(
-                    value: currentStepIndex / totalSteps,
+                    value: currentStepUIIndex / totalSteps,
                     backgroundColor: Colors.white24,
                     valueColor: const AlwaysStoppedAnimation(Colors.green),
                   ),
                 ),
                 const SizedBox(height: 8),
-
-                // Text
                 Text(
-                  instruction,
+                  _readyToCapture ? "Liveness Berhasil!\nSilakan ambil foto" : instruction,
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Colors.white),
                 ),
@@ -389,6 +379,29 @@ Future<void> _startDetectionLoop() async {
             ),
           ),
         ),
+
+        if (_readyToCapture)
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 50), 
+              child: ElevatedButton.icon(
+                onPressed: _isProcessing ? null : _handleManualCapture,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                ),
+                icon: _isProcessing 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.camera_alt, color: Colors.white),
+                label: Text(
+                  _isProcessing ? "Memproses..." : "Ambil Gambar Anda",
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -418,7 +431,6 @@ class _FaceGuidePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final path = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
-
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width * 0.35;
 
