@@ -45,15 +45,38 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
   CameraController? _camera;
   bool _isProcessing = false;
   bool _isSuccess = false;
-  LivenessStep _currentStep = LivenessStep.none;
+  
+  List<LivenessStep> _steps = []; 
+  int _currentStepIndex = 0; 
+  LivenessStep get _currentStep => _steps.isNotEmpty ? _steps[_currentStepIndex] : LivenessStep.none;
+
   bool _wasEyeOpen = false;
   bool _isActive = true;
-  int get totalSteps => 4;
+  int get totalSteps => 4; 
 
   @override
   void initState() {
     super.initState();
+    _generateRandomSteps(); 
     _initCamera();
+  }
+  
+  void _generateRandomSteps() {
+    List<LivenessStep> baseSteps = [
+      LivenessStep.blink,
+      LivenessStep.smile,
+      LivenessStep.turnHead,
+    ];
+    baseSteps.shuffle();
+    
+    setState(() {
+      _steps = [
+        LivenessStep.none,   
+        ...baseSteps,        
+        LivenessStep.done,   
+      ];
+      _currentStepIndex = 0;
+    });
   }
 
   @override
@@ -86,35 +109,35 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
     final rightEye = face.rightEyeOpenProbability ?? 1.0;
     final smile = face.smilingProbability ?? 0.0;
     final headY = face.headEulerAngleY ?? 0.0;
-    debugPrint("LeftEye: $leftEye | RightEye: $rightEye | Smile: $smile | HeadY: $headY");
-    debugPrint("STEP: $_currentStep");
 
     bool isEyeOpen = leftEye > 0.4 && rightEye > 0.4;
     bool isEyeClosed = leftEye < 0.4 && rightEye < 0.4;
+
+    bool stepCompleted = false;
 
     switch (_currentStep) {
       case LivenessStep.none:
         if (isEyeOpen) {
           _wasEyeOpen = true;
-          _currentStep = LivenessStep.blink;
+          stepCompleted = true;
         }
         break;
 
       case LivenessStep.blink:
         if (_wasEyeOpen && isEyeClosed) {
-          _currentStep = LivenessStep.smile;
+          stepCompleted = true;
         }
         break;
 
       case LivenessStep.smile:
         if (smile > 0.6) {
-          _currentStep = LivenessStep.turnHead;
+          stepCompleted = true;
         }
         break;
 
       case LivenessStep.turnHead:
         if (headY > 12 || headY < -12) {
-          _currentStep = LivenessStep.done;
+          stepCompleted = true;
         }
         break;
 
@@ -122,32 +145,37 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
         break;
     }
 
-    if (mounted) setState(() {});
+    if (stepCompleted) {
+      setState(() {
+        _currentStepIndex++;
+        _wasEyeOpen = isEyeOpen; 
+      });
+    }
   }
 
   String get instruction {
-    String text;
-
-    switch (_currentStep) {
-      case LivenessStep.none:
-        text = "Arahkan wajah ke kamera";
-        break;
-      case LivenessStep.blink:
-        text = "Kedipkan mata";
-        break;
-      case LivenessStep.smile:
-        text = "Tersenyum";
-        break;
-      case LivenessStep.turnHead:
-        text = "Putar kepala";
-        break;
-      case LivenessStep.done:
-        text = "Memproses...";
-        break;
+      String text;
+      switch (_currentStep) {
+        case LivenessStep.none:
+          text = "Arahkan wajah ke kamera";
+          break;
+        case LivenessStep.blink:
+          text = "Kedipkan mata";
+          break;
+        case LivenessStep.smile:
+          text = "Tersenyum";
+          break;
+        case LivenessStep.turnHead:
+          text = "Putar kepala";
+          break;
+        case LivenessStep.done:
+          text = "Memproses...";
+          break;
+      }
+      return "Step ${_currentStepIndex + 1}/$totalSteps\n$text";
     }
 
-    return "Step $currentStepIndex/$totalSteps\n$text";
-  }
+    int get currentStepUIIndex => _currentStepIndex + 1;
 
   Future<void> _verifyFace(XFile photo, Face face) async {
     try {
@@ -182,14 +210,12 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
                 context,
                 message: "Wajah tidak cocok, silakan ulangi scan",
                 onOk: () {
+                  _generateRandomSteps(); 
                   setState(() {
-                    _currentStep = LivenessStep.none;
                     _wasEyeOpen = false;
                     _isProcessing = false;
                     _isSuccess = false;
                   });
-                  
-                  // widget.onFailed(); 
                 },
               );
             }
