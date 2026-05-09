@@ -21,6 +21,8 @@ class DetailPengajuanDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final List lampiran = detail['lampiran'] ?? [];
+
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       title: const Text("Detail Pengajuan",
@@ -50,22 +52,38 @@ class DetailPengajuanDialog extends StatelessWidget {
             Text(detail['alasan'] ?? "-"),
             const SizedBox(height: 15),
 
-            if (detail['lampiran'] != null)
-              ElevatedButton.icon(
-                icon: const Icon(Icons.download),
-                label: const Text("Download Lampiran"),
-                onPressed: () async {
-                  final url = Uri.parse(
-                    '${AppConfig.apiUrl}/pengajuan/download/${detail['id_pengajuan']}',
+            if (lampiran.isNotEmpty)
+              ...List.generate(
+                lampiran.length,
+                (index) {
+                  // final file = lampiran[index]['file'];
+                  final nama = lampiran[index]['nama'];
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.download),
+                      label: Text("$nama"),
+                      onPressed: () async {
+                        final url = Uri.parse(
+                          '${AppConfig.apiUrl}/pengajuan/download/${detail['id_pengajuan']}/$index',
+                        );
+
+                        await launchUrl(
+                          url,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      },
+                    ),
                   );
-                  await launchUrl(url,
-                      mode: LaunchMode.externalApplication);
                 },
               )
             else
-              const Text("Tidak ada lampiran",
-                  style: TextStyle(color: Colors.grey)),
-          ],
+              const Text(
+                "Tidak ada lampiran",
+                style: TextStyle(color: Colors.grey),
+              ),          
+  ],
         ),
       ),
       actions: [

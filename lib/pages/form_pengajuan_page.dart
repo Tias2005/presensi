@@ -13,6 +13,7 @@ import '../widgets/pengajuan/date_picker_field.dart';
 import '../widgets/pengajuan/time_picker_field.dart';
 import '../widgets/pengajuan/lampiran_picker.dart';
 import '../widgets/pengajuan/submit_button.dart';
+// import 'dart:math';
 
 class FormPengajuanPage extends StatefulWidget {
   final String tipe;
@@ -34,7 +35,9 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
   DateTime? _tglSelesai;
   TimeOfDay? _jamMulai;
   TimeOfDay? _jamSelesai;
-  File? _imageFile;
+  final List<File> _lampiranFiles = [];
+  static const int _maxFiles = 5;
+  static const int _maxTotalSize = 10 * 1024 * 1024; // 10 MB
   bool _isSubmitting = false;
   int? _sisaCuti;
 
@@ -66,13 +69,74 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
   }
 
   Future<void> _pickFile() async {
+    if (_lampiranFiles.length >= _maxFiles) {
+      AppDialog.show(
+        context,
+        message: "Maksimal $_maxFiles lampiran",
+      );
+      return;
+    }
+
+    final remaining = _maxFiles - _lampiranFiles.length;
+
     final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
       type: FileType.custom,
       allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'],
     );
-    if (result != null && result.files.single.path != null) {
-      setState(() => _imageFile = File(result.files.single.path!));
+
+    if (result == null) return;
+
+    final pickedFiles = result.files
+        .where((f) => f.path != null)
+        .take(remaining)
+        .map((f) => File(f.path!))
+        .toList();
+
+    final combinedFiles = [
+      ..._lampiranFiles,
+      ...pickedFiles,
+    ];
+
+    final totalSize = _getTotalFileSize(combinedFiles);
+
+    if (totalSize > _maxTotalSize) {
+      if (!mounted) return;
+
+      AppDialog.show(
+        context,
+        message: "Total ukuran lampiran maksimal 10 MB",
+      );
+      return;
     }
+
+    setState(() {
+      _lampiranFiles.addAll(pickedFiles);
+    });
+
+    if (result.files.length > remaining && mounted) {
+      AppDialog.show(
+        context,
+        message:
+            "Hanya $remaining file yang ditambahkan (maksimal $_maxFiles file)",
+      );
+    }
+  }
+
+  void _removeFile(int index) {
+    setState(() {
+      _lampiranFiles.removeAt(index);
+    });
+  }
+
+  int _getTotalFileSize(List<File> files) {
+    int total = 0;
+
+    for (final file in files) {
+      total += file.lengthSync();
+    }
+
+    return total;
   }
 
   Future<void> _selectDate(bool isMulai) async {
@@ -117,6 +181,7 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
         'POST',
         Uri.parse("${AppConfig.apiUrl}/pengajuan/store"),
       );
+      request.headers['Accept'] = 'application/json';
 
       final tglMulaiStr = DateFormat('yyyy-MM-dd').format(_tglMulai!);
 
@@ -136,9 +201,12 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
             DateFormat('yyyy-MM-dd').format(_tglSelesai!);
       }
 
-      if (_imageFile != null) {
+      for (final file in _lampiranFiles) {
         request.files.add(
-          await http.MultipartFile.fromPath('lampiran', _imageFile!.path),
+          await http.MultipartFile.fromPath(
+            'lampiran[]', 
+            file.path,
+          ),
         );
       }
 
@@ -190,7 +258,6 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Row(
               children: [
                 Container(
@@ -213,7 +280,6 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
               ],
             ),
 
-            // Info sisa cuti (khusus tipe Cuti)
             if (widget.tipe == "Cuti") ...[
               const SizedBox(height: 15),
               SisaCutiInfo(sisaCuti: _sisaCuti),
@@ -221,14 +287,12 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
 
             const SizedBox(height: 25),
 
-            // Tanggal mulai / tanggal lembur
             DatePickerField(
               label: widget.tipe == "Lembur" ? "Tanggal Lembur" : "Tanggal Mulai",
               selectedDate: _tglMulai,
               onTap: () => _selectDate(true),
             ),
 
-            // Tanggal selesai (bukan lembur)
             if (widget.tipe != "Lembur") ...[
               const SizedBox(height: 15),
               DatePickerField(
@@ -238,7 +302,6 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
               ),
             ],
 
-            // Jam mulai & selesai (khusus lembur)
             if (widget.tipe == "Lembur") ...[
               const SizedBox(height: 15),
               Row(
@@ -262,7 +325,6 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
               ),
             ],
 
-            // Alasan
             const SizedBox(height: 15),
             const Text("Alasan",
                 style: TextStyle(fontWeight: FontWeight.w500)),
@@ -279,11 +341,13 @@ class _FormPengajuanPageState extends State<FormPengajuanPage> {
               ),
             ),
 
-            // Lampiran
             const SizedBox(height: 15),
-            LampiranPicker(file: _imageFile, onTap: _pickFile),
+            LampiranPicker(
+              files: _lampiranFiles,
+              onTap: _pickFile,
+              onRemove: _removeFile,
+            ),
 
-            // Tombol submit
             const SizedBox(height: 30),
             SubmitButton(
               isSubmitting: _isSubmitting,
