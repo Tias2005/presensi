@@ -144,15 +144,18 @@ class _StepGeoWidgetState extends State<StepGeoWidget> {
 
   Future<bool> _checkLocationPermission() async {
     var status = await Permission.location.status;
+    
     if (status.isGranted) return true;
+
     if (status.isDenied) {
       status = await Permission.location.request();
-      return status.isGranted;
+      if (status.isGranted) return true;
     }
-    if (status.isPermanentlyDenied) {
+
+    if (status.isPermanentlyDenied || status.isDenied) {
       _showPermissionDialog(
         "Izin Lokasi Dibutuhkan",
-        "Untuk melacak lokasi Anda harus mengaktifkan izin lokasi di pengaturan.",
+        "Tidak dapat melakukan lacak lokasi. Mohon izinkan akses GPS perangkat terlebih dahulu, buka pengaturan di\n\nPengaturan > Aplikasi > Presensi > Izin > Posisi.",
       );
     }
     return false;
@@ -161,17 +164,22 @@ class _StepGeoWidgetState extends State<StepGeoWidget> {
   void _showPermissionDialog(String title, String message) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (_) => AlertDialog(
-        title: Text(title),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         content: Text(message),
         actions: [
           TextButton(
-            child: const Text("Nanti Saja"),
+            child: const Text("Nanti Saja", style: TextStyle(color: Colors.grey)),
             onPressed: () => Navigator.pop(context),
           ),
           ElevatedButton(
-            onPressed: openAppSettings,
-            child: const Text("Pengaturan"),
+            onPressed: () {
+              openAppSettings();
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text("Buka Pengaturan"),
           ),
         ],
       ),
@@ -255,13 +263,7 @@ class _StepGeoWidgetState extends State<StepGeoWidget> {
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
-                // Text(
-                //   "Akurasi GPS: ±${_pos!.accuracy.toStringAsFixed(0)} meter",
-                //   style: const TextStyle(
-                //     color: Colors.grey,
-                //     fontSize: 12,
-                //   ),
-                // ),
+
               ],
               const SizedBox(height: 10),
               SizedBox(
