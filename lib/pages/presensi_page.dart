@@ -212,6 +212,9 @@ class _PresensiPageState extends State<PresensiPage> {
             _capturedPhoto = file;
             _currentStep = 3;
           }),
+          onFailed: () => setState(() {
+            _currentStep = 1; 
+          }),
         );
 
       case 3:

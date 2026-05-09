@@ -27,12 +27,14 @@ class StepFaceWidget extends StatefulWidget {
   final FaceDetector faceDetector;
   final Interpreter interpreter;
   final Function(XFile) onResult;
+  final VoidCallback onFailed;
 
   const StepFaceWidget({
     super.key,
     required this.faceDetector,
     required this.interpreter,
     required this.onResult,
+    required this.onFailed,
   });
 
   @override
@@ -45,6 +47,7 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
   bool _isSuccess = false;
   LivenessStep _currentStep = LivenessStep.none;
   bool _wasEyeOpen = false;
+  bool _isActive = true;
   int get totalSteps => 4;
 
   @override
@@ -55,6 +58,7 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
 
   @override
   void dispose() {
+    _isActive = false;
     _camera?.dispose();
     super.dispose();
   }
@@ -166,18 +170,29 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
 
       if (score > 0.60) {
         _isSuccess = true;
+
+          _isActive = false;
+          _camera?.dispose();
+
         widget.onResult(photo);
       } else {
-        if (!mounted) return;
+              if (!mounted) return;
 
-        AppDialog.show(
-          context,
-          message: "Wajah tidak cocok, silakan ulangi scan",
-          onOk: () {
-            Navigator.pop(context); 
-          },
-        );
-      }
+              AppDialog.show(
+                context,
+                message: "Wajah tidak cocok, silakan ulangi scan",
+                onOk: () {
+                  setState(() {
+                    _currentStep = LivenessStep.none;
+                    _wasEyeOpen = false;
+                    _isProcessing = false;
+                    _isSuccess = false;
+                  });
+                  
+                  // widget.onFailed(); 
+                },
+              );
+            }
     } catch (e) {
       if (!mounted) return;
       AppDialog.show(context, message: e.toString());
@@ -242,7 +257,7 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
   }
 
 Future<void> _startDetectionLoop() async {
-  while (_camera != null && _camera!.value.isInitialized) {
+  while (_isActive && _camera != null && _camera!.value.isInitialized) {
     if (_isProcessing) {
       await Future.delayed(const Duration(milliseconds: 300));
       continue;
