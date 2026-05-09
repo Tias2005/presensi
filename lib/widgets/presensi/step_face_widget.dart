@@ -164,11 +164,19 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
 
       final score = _cosineDistance(registered, current);
 
-      if (score > 0.70) {
+      if (score > 0.60) {
         _isSuccess = true;
         widget.onResult(photo);
       } else {
-        throw "Wajah tidak cocok, silakan ulangi scan";
+        if (!mounted) return;
+
+        AppDialog.show(
+          context,
+          message: "Wajah tidak cocok, silakan ulangi scan",
+          onOk: () {
+            Navigator.pop(context); 
+          },
+        );
       }
     } catch (e) {
       if (!mounted) return;

@@ -48,32 +48,19 @@ class _StepGeoWidgetState extends State<StepGeoWidget> {
     return samples;
   }
 
-  String? _detectFakeGps(List<Position> samples) {
-    final hasMock = samples.any((p) => p.isMocked);
-    if (hasMock) {
-      return "Terdeteksi Mock Location.";
-    }
-
-    for (int i = 1; i < samples.length; i++) {
-      final d = Geolocator.distanceBetween(
-        samples[i - 1].latitude,
-        samples[i - 1].longitude,
-        samples[i].latitude,
-        samples[i].longitude,
-      );
-
-      if (d > 100) {
-        return "Pergerakan GPS tidak wajar (${d.toStringAsFixed(0)} m).";
+    String? _detectFakeGps(List<Position> samples) {
+      final hasMock = samples.any((p) => p.isMocked);
+      if (hasMock) {
+        return "Terdeteksi Fake GPS.";
       }
-    }
 
-    final badAccuracy = samples.every((p) => p.accuracy > 100);
-    if (badAccuracy) {
-      return "Sinyal GPS lemah. Pindah ke area terbuka.";
-    }
+      final badAccuracy = samples.every((p) => p.accuracy > 100);
+      if (badAccuracy) {
+        return "Sinyal GPS lemah. Pindah ke area terbuka.";
+      }
 
-    return null;
-  }
+      return null;
+    }
 
   Future<void> _checkLocation() async {
     setState(() => _loadingLocation = true);
