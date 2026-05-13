@@ -9,7 +9,7 @@ import 'dashboard_page.dart';
 import 'face_register_page.dart';
 import 'forgot_password_page.dart';
 import '../config.dart';
-
+import 'address_register_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -83,12 +83,23 @@ class _LoginPageState extends State<LoginPage> {
             MaterialPageRoute(builder: (context) => const FaceRegisterPage())
           );
         } else {
+        final lat = data['user']['latitude_rumah'];
+        final long = data['user']['longitude_rumah'];
+
+        bool hasLocation = (lat != null && long != null && lat != 0);
+
+        if (!hasLocation) {
+          Navigator.pushReplacement(
+            context, 
+            MaterialPageRoute(builder: (context) => const AddressRegisterPage())
+          );
+        } else {
           Navigator.pushReplacement(
             context, 
             MaterialPageRoute(builder: (context) => const DashboardPage())
           );
         }
-      } else {
+      }} else {
         throw data['message'] ?? 'Gagal Terhubung ke Server';
       } 
     } catch (e) {

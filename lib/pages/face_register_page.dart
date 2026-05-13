@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/theme.dart'; 
 import 'dashboard_page.dart';
+import 'address_register_page.dart';
 import '../config.dart';
 import '../widgets/app_dialog.dart';
 import '../services/user_service.dart';
@@ -133,13 +134,34 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
           context,
           message: "Berhasil! Wajah Anda kini terdaftar.",
           isSuccess: true,
-          onOk: () {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const DashboardPage()),
-                  (route) => false, 
-                );
-              },
+          onOk: () async {
+            await UserService.refreshUserData();
+
+            final prefs = await SharedPreferences.getInstance();
+            final userDataStr = prefs.getString('user_data');
+            final userData = jsonDecode(userDataStr!);
+
+            final lat = userData['latitude_rumah'];
+            final long = userData['longitude_rumah'];
+
+            bool hasLocation = (lat != null && long != null && lat != 0 && long != 0);
+
+            if (!mounted) return;
+
+            if (!hasLocation) {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const AddressRegisterPage()),
+                (route) => false,
+              );
+            } else {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const DashboardPage()),
+                (route) => false,
+              );
+            }
+          },
         );
       } else {
         dev.log("Error Body: ${response.body}", name: "API_ERROR");

@@ -5,6 +5,8 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'pages/login_page.dart';
 import 'pages/dashboard_page.dart';
+import 'pages/face_register_page.dart';
+import 'pages/address_register_page.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'dart:developer' as dev;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -112,6 +114,33 @@ class MyApp extends StatelessWidget {
   final bool isLoggedIn;
   const MyApp({super.key, required this.isLoggedIn});
 
+  Widget _getInitialPage() {
+    if (!isLoggedIn) return const LoginPage();
+
+    return FutureBuilder(
+      future: SharedPreferences.getInstance(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        
+        final prefs = snapshot.data as SharedPreferences;
+        final userDataStr = prefs.getString('user_data');
+        if (userDataStr == null) return const LoginPage();
+
+        final userData = jsonDecode(userDataStr);
+        
+        final embedding = userData['embedding_vector'];
+        bool hasFace = (embedding != null && embedding.toString() != "[]" && embedding.toString() != "null");
+        if (!hasFace) return const FaceRegisterPage();
+
+        final lat = userData['latitude_rumah'];
+        bool hasLocation = (lat != null && lat.toString() != "0" && lat.toString() != "null");
+        if (!hasLocation) return const AddressRegisterPage();
+
+        return const DashboardPage();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -128,7 +157,8 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       locale: const Locale('id', 'ID'), 
-      home: isLoggedIn ? const DashboardPage() : const LoginPage(),
+      home: _getInitialPage(),
+      // home: isLoggedIn ? const DashboardPage() : const LoginPage(),
     );
   }
 }
