@@ -9,7 +9,7 @@ import 'package:image/image.dart' as img;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/theme.dart'; 
-// import 'dashboard_page.dart';
+import 'dashboard_page.dart';
 import '../config.dart';
 import '../widgets/app_dialog.dart';
 import '../services/user_service.dart';
@@ -119,7 +119,6 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-
         final prefs = await SharedPreferences.getInstance();
 
         if (responseData['user'] != null) {
@@ -135,8 +134,12 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
           message: "Berhasil! Wajah Anda kini terdaftar.",
           isSuccess: true,
           onOk: () {
-            Navigator.pop(context, true);
-          },
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const DashboardPage()),
+                  (route) => false, 
+                );
+              },
         );
       } else {
         dev.log("Error Body: ${response.body}", name: "API_ERROR");

@@ -22,7 +22,7 @@ class TabPresensi extends StatelessWidget {
       itemCount: riwayatHarian.length,
       itemBuilder: (context, index) {
         final item = riwayatHarian[index];
-        final tanggal = DateFormat('EEEE, dd MMM yyyy')
+        final tanggal = DateFormat('EEEE, dd MMM yyyy', 'id_ID')
             .format(DateTime.parse(item['tanggal']));
         final isTepatWaktu = item['id_status_presensi'] == 1;
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class TabPengajuan extends StatelessWidget {
   final List riwayatPengajuan;
@@ -21,6 +22,15 @@ class TabPengajuan extends StatelessWidget {
       itemCount: riwayatPengajuan.length,
       itemBuilder: (context, index) {
         final item = riwayatPengajuan[index];
+      String infoWaktu = "-";
+        try {
+          final String rawDate = item['create_at'] ?? item['tanggal_mulai'];
+          DateTime dt = DateTime.parse(rawDate).toLocal(); 
+          
+          infoWaktu = DateFormat('EEEE, dd MMM yyyy HH:mm', 'id_ID').format(dt);
+        } catch (e) {
+          infoWaktu = item['tanggal_mulai'];
+        }
         final status = item['status_pengajuan'];
         final Color statusColor = status == "Disetujui"
             ? Colors.green
@@ -37,7 +47,7 @@ class TabPengajuan extends StatelessWidget {
               item['kategori']['nama_pengajuan'],
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            subtitle: Text("Tanggal: ${item['tanggal_mulai']}"),
+            subtitle: Text("Diajukan: $infoWaktu"),
             trailing: Text(
               status,
               style: TextStyle(

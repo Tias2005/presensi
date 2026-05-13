@@ -68,14 +68,25 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       final dynamic embedding = data['user']['embedding_vector'];
-      bool hasFaceData = embedding != null &&
-          embedding.toString().isNotEmpty &&
-          embedding.toString() != "null";
+      bool hasFaceData = false;
+        if (embedding != null) {
+          if (embedding is List && embedding.isNotEmpty) {
+            hasFaceData = true;
+          } else if (embedding.toString() != "[]" && embedding.toString().isNotEmpty && embedding.toString() != "null") {
+            hasFaceData = true;
+          }
+        }
 
-      if (!hasFaceData) {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const FaceRegisterPage()));
-      } else {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const DashboardPage()));
+        if (!hasFaceData) {
+          Navigator.pushReplacement(
+            context, 
+            MaterialPageRoute(builder: (context) => const FaceRegisterPage())
+          );
+        } else {
+          Navigator.pushReplacement(
+            context, 
+            MaterialPageRoute(builder: (context) => const DashboardPage())
+          );
         }
       } else {
         throw data['message'] ?? 'Gagal Terhubung ke Server';
