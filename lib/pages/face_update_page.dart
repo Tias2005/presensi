@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'dart:developer' as dev;
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
@@ -9,26 +10,24 @@ import 'package:image/image.dart' as img;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/theme.dart';
-import 'dashboard_page.dart';
-import 'address_register_page.dart';
 import '../config.dart';
 import '../widgets/app_dialog.dart';
 import '../services/user_service.dart';
-import 'dart:math' as math;
 import '../helpers/permission_helper.dart';
 
-class FaceRegisterPage extends StatefulWidget {
-  const FaceRegisterPage({super.key});
+class FaceUpdatePage extends StatefulWidget {
+  const FaceUpdatePage({super.key});
 
   @override
-  State<FaceRegisterPage> createState() => _FaceRegisterPageState();
+  State<FaceUpdatePage> createState() => _FaceUpdatePageState();
 }
 
-class _FaceRegisterPageState extends State<FaceRegisterPage> {
-  late CameraController _controller;
+class _FaceUpdatePageState extends State<FaceUpdatePage> {
+  CameraController? _controller;
   Interpreter? _interpreter;
   bool _isReady = false;
   bool _isProcessing = false;
+
   final FaceDetector _faceDetector = FaceDetector(
     options: FaceDetectorOptions(
       performanceMode: FaceDetectorMode.fast,
@@ -53,48 +52,60 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
     if (!allowed) return;
 
     final cameras = await availableCameras();
-    _controller = CameraController(
+    if (cameras.isEmpty) {
+      _showSnackBar("Tidak ada kamera yang tersedia.");
+      return;
+    }
+
+    final controller = CameraController(
       cameras.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.front,
         orElse: () => cameras.first,
       ),
       ResolutionPreset.high,
     );
-    await _controller.initialize();
+
+    await controller.initialize();
     _interpreter = await Interpreter.fromAsset('assets/models/mobilefacenet.tflite');
-    if (mounted) setState(() => _isReady = true);
+
+    if (mounted) {
+      setState(() {
+        _controller = controller;
+        _isReady = true;
+      });
+    }
   }
 
   List<double> _extractEmbedding(File file, Face face) {
     final image = img.decodeImage(file.readAsBytesSync())!;
 
-    int x = face.boundingBox.left.toInt().clamp(0, image.width - 1);
-    int y = face.boundingBox.top.toInt().clamp(0, image.height - 1);
-    int w = face.boundingBox.width.toInt().clamp(0, image.width - x);
-    int h = face.boundingBox.height.toInt().clamp(0, image.height - y);
+    final x = face.boundingBox.left.toInt().clamp(0, image.width - 1);
+    final y = face.boundingBox.top.toInt().clamp(0, image.height - 1);
+    final w = face.boundingBox.width.toInt().clamp(0, image.width - x);
+    final h = face.boundingBox.height.toInt().clamp(0, image.height - y);
 
     final crop = img.copyCrop(image, x: x, y: y, width: w, height: h);
     final resized = img.copyResize(crop, width: 112, height: 112);
 
-    var input = [
+    final input = [
       List.generate(112, (row) => List.generate(112, (col) {
             final pixel = resized.getPixel(col, row);
             return [pixel.r / 255.0, pixel.g / 255.0, pixel.b / 255.0];
           }))
     ];
 
-    var output = List.filled(1 * 192, 0.0).reshape([1, 192]);
+    final output = List.filled(1 * 192, 0.0).reshape([1, 192]);
     _interpreter?.run(input, output);
+
     List<double> emb = List<double>.from(output[0]);
-
     double norm = math.sqrt(emb.fold(0, (sum, e) => sum + e * e));
-    emb = emb.map((e) => e / norm).toList();
-
-    return emb;
+    return emb.map((e) => e / norm).toList();
   }
 
-  Future<void> _registerFace() async {
+  Future<void> _updateFace() async {
+    if (_controller == null) return;
     setState(() => _isProcessing = true);
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
@@ -104,15 +115,17 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
       final userData = jsonDecode(userDataString);
       final String idUser = userData['id_user'].toString();
 
-      final photo = await _controller.takePicture();
-      final faces = await _faceDetector.processImage(InputImage.fromFile(File(photo.path)));
+      final photo = await _controller!.takePicture();
+      final faces = await _faceDetector.processImage(
+        InputImage.fromFile(File(photo.path)),
+      );
 
       if (faces.isEmpty) throw "Wajah tidak terdeteksi. Pastikan pencahayaan cukup.";
 
       final embedding = _extractEmbedding(File(photo.path), faces.first);
-      String postgresArray = "{${embedding.join(',')}}";
+      final postgresArray = "{${embedding.join(',')}}";
 
-      var request = http.MultipartRequest(
+      final request = http.MultipartRequest(
         'POST',
         Uri.parse('${AppConfig.apiUrl}/user/register-face'),
       );
@@ -127,11 +140,10 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
-      dev.log(response.body, name: "REGISTER_FACE_RESPONSE");
+      dev.log(response.body, name: "UPDATE_FACE_RESPONSE");
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        final prefs = await SharedPreferences.getInstance();
 
         if (responseData['user'] != null) {
           await prefs.setString('user_data', jsonEncode(responseData['user']));
@@ -143,54 +155,42 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
 
         AppDialog.show(
           context,
-          message: "Berhasil! Wajah Anda kini terdaftar.",
+          message: "Data wajah berhasil diperbarui.",
           isSuccess: true,
-          onOk: () async {
-            await UserService.refreshUserData();
-
-            final prefs = await SharedPreferences.getInstance();
-            final userDataStr = prefs.getString('user_data');
-            final userData = jsonDecode(userDataStr!);
-
-            final lat = userData['latitude_rumah'];
-            final long = userData['longitude_rumah'];
-            bool hasLocation =
-                (lat != null && long != null && lat != 0 && long != 0);
-
-            if (!mounted) return;
-
-            if (!hasLocation) {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const AddressRegisterPage()),
-                (route) => false,
-              );
-            } else {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const DashboardPage()),
-                (route) => false,
-              );
-            }
+          onOk: () {
+            if (mounted) Navigator.pop(context, true);
           },
         );
       } else {
         dev.log("Error Body: ${response.body}", name: "API_ERROR");
-        throw "Gagal mendaftarkan wajah. Coba lagi nanti.";
+        throw "Gagal memperbarui data wajah. Coba lagi nanti.";
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
-      );
+      _showSnackBar(e.toString());
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
   }
 
+  void _showSnackBar(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.red),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    _faceDetector.close();
+    _interpreter?.close();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (!_isReady) {
+    if (!_isReady || _controller == null) {
       return const Scaffold(
         backgroundColor: AppColors.primary,
         body: Center(child: CircularProgressIndicator(color: Colors.white)),
@@ -201,19 +201,20 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         title: const Text(
-          "Registrasi Wajah",
+          "Update Data Wajah",  
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: AppColors.primary,
         elevation: 0,
         centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Stack(
         children: [
           Center(
             child: AspectRatio(
-              aspectRatio: 1 / _controller.value.aspectRatio,
-              child: CameraPreview(_controller),
+              aspectRatio: 1 / _controller!.value.aspectRatio,
+              child: CameraPreview(_controller!),
             ),
           ),
 
@@ -264,7 +265,7 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
             children: [
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(25, 20, 25, 25),
+                padding: const EdgeInsets.all(25),
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.only(
@@ -274,25 +275,6 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
                 ),
                 child: Column(
                   children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: const Text(
-                        "Halo! Sepertinya Anda belum mendaftarkan data wajah. "
-                        "Silakan ambil foto wajah Anda untuk keperluan verifikasi presensi.",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, color: Colors.black54, height: 1.4),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
                     const Text(
                       "Posisikan Wajah Anda",
                       style: TextStyle(
@@ -301,18 +283,18 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
                         color: AppColors.primary,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     const Text(
                       "Pastikan wajah berada di dalam lingkaran dan pencahayaan terang.",
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.grey),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 25),
                     SizedBox(
                       width: double.infinity,
                       height: 55,
                       child: ElevatedButton.icon(
-                        onPressed: _isProcessing ? null : _registerFace,
+                        onPressed: _isProcessing ? null : _updateFace,
                         icon: _isProcessing
                             ? const SizedBox.shrink()
                             : const Icon(Icons.camera_alt, color: Colors.white),
@@ -342,13 +324,5 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _faceDetector.close();
-    _interpreter?.close();
-    super.dispose();
   }
 }

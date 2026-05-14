@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:developer' as dev;
 import 'dart:convert';
@@ -10,9 +11,9 @@ import 'package:geocoding/geocoding.dart';
 import '../shared/theme.dart';
 import '../config.dart';
 import '../widgets/app_dialog.dart';
-import '../helpers/permission_helper.dart'; 
+import '../helpers/permission_helper.dart';
 import 'login_page.dart';
-import 'face_register_page.dart';
+import 'face_update_page.dart';
 import '../widgets/profile/section_header.dart';
 import '../widgets/profile/profile_text_field.dart';
 import '../widgets/profile/home_location_map.dart';
@@ -30,7 +31,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _namaController;
   late TextEditingController _emailController;
-  late TextEditingController _phoneController;
+  late TextEditingController _phoneController; 
   late TextEditingController _alamatController;
   final TextEditingController _passLamaController = TextEditingController();
   final TextEditingController _passBaruController = TextEditingController();
@@ -39,12 +40,23 @@ class _EditProfilePageState extends State<EditProfilePage> {
   LatLng? _selectedLocation;
   bool _isLoading = false;
 
+  String _stripPrefix(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    String s = raw.trim();
+    if (s.startsWith('+62')) return s.substring(3);
+    if (s.startsWith('62')) return s.substring(2);
+    if (s.startsWith('0')) return s.substring(1);
+    return s;
+  }
+
   @override
   void initState() {
     super.initState();
     _namaController = TextEditingController(text: widget.userData['nama_user']);
     _emailController = TextEditingController(text: widget.userData['email_user']);
-    _phoneController = TextEditingController(text: widget.userData['no_telepon']?.toString());
+    _phoneController = TextEditingController(
+      text: _stripPrefix(widget.userData['no_telepon']?.toString()),
+    );
     _alamatController = TextEditingController(text: widget.userData['alamat']);
 
     double lat = double.tryParse(widget.userData['latitude_rumah']?.toString() ?? "0") ?? -6.2000;
@@ -110,6 +122,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
 
+      final fullPhone = '+62${_phoneController.text.trim()}';
+
       final response = await http.post(
         Uri.parse("${AppConfig.apiUrl}/user/update/${widget.userData['id_user']}"),
         headers: {
@@ -119,7 +133,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         body: {
           'nama_user': _namaController.text,
           'email_user': _emailController.text,
-          'no_telepon': _phoneController.text,
+          'no_telepon': fullPhone,
           'alamat': _alamatController.text,
           'latitude_rumah': _selectedLocation?.latitude.toString(),
           'longitude_rumah': _selectedLocation?.longitude.toString(),
@@ -135,9 +149,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       if (response.statusCode == 200) {
         if (data['password_changed'] == true) {
           await prefs.clear();
-
           if (!mounted) return;
-
           AppDialog.show(
             context,
             message: "Password berhasil diubah. Silakan login kembali.",
@@ -180,14 +192,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  Future<void> _goToFaceRegister() async {
+  Future<void> _goToFaceUpdate() async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const FaceRegisterPage()),
+      MaterialPageRoute(builder: (_) => const FaceUpdatePage()),
     );
-
     if (!mounted) return;
-
     if (result == true) Navigator.pop(context, true);
   }
 
@@ -217,7 +227,34 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
               ProfileTextField("Nama Lengkap", _namaController, Icons.person_outline),
               ProfileTextField("Email", _emailController, Icons.email_outlined),
-              ProfileTextField("No. Telepon", _phoneController, Icons.phone_android_outlined),
+
+              Padding(
+                padding: const EdgeInsets.only(bottom: 15),
+                child: TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: "No. Telepon",
+                    prefixIcon: const Icon(Icons.phone_android_outlined),
+                    prefix: const Text(
+                      '+62 ',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'No. telepon wajib diisi';
+                    if (val.trim().length < 7) return 'Nomor terlalu pendek';
+                    return null;
+                  },
+                ),
+              ),
+
               ProfileTextField("Alamat", _alamatController, Icons.location_on_outlined, maxLines: 2),
 
               const SizedBox(height: 10),
@@ -243,7 +280,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               SecuritySection(
                 passLamaController: _passLamaController,
                 passBaruController: _passBaruController,
-                onUpdateFace: _goToFaceRegister,
+                onUpdateFace: _goToFaceUpdate,
               ),
 
               const SizedBox(height: 30),
