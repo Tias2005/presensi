@@ -10,7 +10,7 @@ import 'package:geocoding/geocoding.dart';
 import '../shared/theme.dart';
 import '../config.dart';
 import '../widgets/app_dialog.dart';
-// import '../services/user_service.dart';
+import '../helpers/permission_helper.dart'; 
 import 'login_page.dart';
 import 'face_register_page.dart';
 import '../widgets/profile/section_header.dart';
@@ -42,21 +42,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   void initState() {
     super.initState();
-    _namaController =
-        TextEditingController(text: widget.userData['nama_user']);
-    _emailController =
-        TextEditingController(text: widget.userData['email_user']);
-    _phoneController =
-        TextEditingController(text: widget.userData['no_telepon']?.toString());
-    _alamatController =
-        TextEditingController(text: widget.userData['alamat']);
+    _namaController = TextEditingController(text: widget.userData['nama_user']);
+    _emailController = TextEditingController(text: widget.userData['email_user']);
+    _phoneController = TextEditingController(text: widget.userData['no_telepon']?.toString());
+    _alamatController = TextEditingController(text: widget.userData['alamat']);
 
-    double lat = double.tryParse(
-            widget.userData['latitude_rumah']?.toString() ?? "0") ??
-        -6.2000;
-    double lng = double.tryParse(
-            widget.userData['longitude_rumah']?.toString() ?? "0") ??
-        106.8166;
+    double lat = double.tryParse(widget.userData['latitude_rumah']?.toString() ?? "0") ?? -6.2000;
+    double lng = double.tryParse(widget.userData['longitude_rumah']?.toString() ?? "0") ?? 106.8166;
     if (lat == 0 && lng == 0) {
       lat = -6.2000;
       lng = 106.8166;
@@ -64,21 +56,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _selectedLocation = LatLng(lat, lng);
   }
 
-
   Future<void> _getCurrentLocation() async {
+    final allowed = await PermissionHelper.requestLocation(context: context);
+    if (!allowed) return;
+
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       _showSnackBar("Layanan lokasi nonaktif. Aktifkan GPS Anda.");
       return;
-    }
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        _showSnackBar("Izin lokasi ditolak.");
-        return;
-      }
     }
 
     setState(() => _isLoading = true);
@@ -87,8 +72,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         accuracy: LocationAccuracy.high,
         distanceFilter: 10,
       );
-      final position = await Geolocator.getCurrentPosition(
-          locationSettings: locationSettings);
+      final position = await Geolocator.getCurrentPosition(locationSettings: locationSettings);
       final currentLatLng = LatLng(position.latitude, position.longitude);
 
       setState(() => _selectedLocation = currentLatLng);
@@ -98,14 +82,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
     } catch (e) {
       _showSnackBar("Gagal mengambil lokasi: $e");
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _getAddressFromLatLng(LatLng position) async {
     try {
-      final placemarks = await placemarkFromCoordinates(
-          position.latitude, position.longitude);
+      final placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
       if (placemarks.isNotEmpty) {
         final p = placemarks.first;
         setState(() {
@@ -145,7 +128,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         },
       );
 
-      if (!mounted) return; 
+      if (!mounted) return;
 
       final data = jsonDecode(response.body);
 
@@ -191,11 +174,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   void _showSnackBar(String msg) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
-      );
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+    );
+  }
 
   Future<void> _goToFaceRegister() async {
     final result = await Navigator.push(
@@ -203,11 +186,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
       MaterialPageRoute(builder: (_) => const FaceRegisterPage()),
     );
 
-    if (!mounted) return; 
+    if (!mounted) return;
 
     if (result == true) Navigator.pop(context, true);
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -216,8 +198,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       appBar: AppBar(
         title: const Text(
           "Edit Profil",
-          style: TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
         ),
         backgroundColor: AppColors.primary,
         elevation: 0,
@@ -234,23 +215,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
               const SectionHeader(title: "Data Umum"),
               const SizedBox(height: 20),
 
-              ProfileTextField("Nama Lengkap", _namaController,
-                  Icons.person_outline),
-              ProfileTextField(
-                  "Email", _emailController, Icons.email_outlined),
-              ProfileTextField("No. Telepon", _phoneController,
-                  Icons.phone_android_outlined),
-              ProfileTextField("Alamat", _alamatController,
-                  Icons.location_on_outlined,
-                  maxLines: 2),
+              ProfileTextField("Nama Lengkap", _namaController, Icons.person_outline),
+              ProfileTextField("Email", _emailController, Icons.email_outlined),
+              ProfileTextField("No. Telepon", _phoneController, Icons.phone_android_outlined),
+              ProfileTextField("Alamat", _alamatController, Icons.location_on_outlined, maxLines: 2),
 
               const SizedBox(height: 10),
               const Text(
                 "Titik Lokasi Rumah",
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: AppColors.primary),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary),
               ),
               const SizedBox(height: 12),
 
@@ -282,15 +255,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   onPressed: _isLoading ? null : _updateProfile,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("SIMPAN PERUBAHAN",
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold)),
+                      : const Text(
+                          "SIMPAN PERUBAHAN",
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
             ],

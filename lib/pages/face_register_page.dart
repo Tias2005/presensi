@@ -15,6 +15,7 @@ import '../config.dart';
 import '../widgets/app_dialog.dart';
 import '../services/user_service.dart';
 import 'dart:math' as math;
+import '../helpers/permission_helper.dart';
 
 class FaceRegisterPage extends StatefulWidget {
   const FaceRegisterPage({super.key});
@@ -43,6 +44,14 @@ class _FaceRegisterPageState extends State<FaceRegisterPage> {
   }
 
   Future<void> _initScanner() async {
+    final allowed = await PermissionHelper.requestCamera(
+      context: context,
+      onDismiss: () {
+        if (mounted) Navigator.pop(context);
+      },
+    );
+    if (!allowed) return;
+
     final cameras = await availableCameras();
     _controller = CameraController(
       cameras.firstWhere(

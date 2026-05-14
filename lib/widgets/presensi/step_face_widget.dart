@@ -7,10 +7,9 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:permission_handler/permission_handler.dart';
 import '../../services/user_service.dart';
 import '../../widgets/app_dialog.dart';
-import '../../shared/theme.dart';
+import '../../helpers/permission_helper.dart';
 
 enum LivenessStep {
   none,
@@ -84,7 +83,7 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
   }
 
   Future<void> _initCamera() async {
-    final allowed = await _checkCameraPermission();
+    final allowed = await PermissionHelper.requestCamera(context: context);
     if (!allowed) return;
 
     final cams = await availableCameras();
@@ -322,68 +321,6 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
-  }
-  
-  void _showPermissionDialog(String title, String message) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), 
-        title: Text(
-          title, 
-          style: const TextStyle(fontWeight: FontWeight.bold)
-        ),
-        content: Text(message),
-        actions: [
-          TextButton(
-            child: const Text(
-              "Nanti Saja", 
-              style: TextStyle(color: Colors.grey)
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              widget.onFailed();
-            },
-          ),
-          ElevatedButton(
-            onPressed: () {
-              openAppSettings();
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary, 
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text(
-              "Buka Pengaturan",
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<bool> _checkCameraPermission() async {
-    var status = await Permission.camera.status;
-    
-    if (status.isGranted) return true;
-
-    if (status.isDenied) {
-      status = await Permission.camera.request();
-      if (status.isGranted) return true;
-    }
-
-    if (status.isPermanentlyDenied || status.isDenied) {
-      _showPermissionDialog(
-        "Izin Kamera Dibutuhkan",
-        "Tidak dapat melakukan face recognition. Mohon izinkan akses kamera perangkat terlebih dahulu, buka pengaturan di\n\nPengaturan > Aplikasi > Presensi > Izin > Kamera.",
-      );
-    }
-    return false;
   }
 
   int get currentStepUIIndex {

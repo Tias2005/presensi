@@ -7,7 +7,7 @@ import '../shared/theme.dart';
 import '../config.dart';
 import 'dashboard_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:permission_handler/permission_handler.dart';
+import '../helpers/permission_helper.dart';
 
 class AddressRegisterPage extends StatefulWidget {
   const AddressRegisterPage({super.key});
@@ -21,35 +21,10 @@ class _AddressRegisterPageState extends State<AddressRegisterPage> {
   Position? _currentPosition;
   bool _isLoading = false;
 
-Future<bool> _checkLocationPermission() async {
-  var status = await Permission.location.status;
-
-  if (status.isGranted) return true;
-
-  if (status.isDenied) {
-    status = await Permission.location.request();
-    if (status.isGranted) return true;
-  }
-
-  if (status.isPermanentlyDenied || status.isDenied) {
-    if (!mounted) return false; 
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Izin lokasi diperlukan. Silakan aktifkan di pengaturan."),
-      ),
-    );
-
-    openAppSettings();
-  }
-
-  return false;
-}
-
 Future<void> _getCurrentLocation() async {
   setState(() => _isLoading = true);
 
-  final allowed = await _checkLocationPermission();
+  final allowed = await PermissionHelper.requestLocation(context: context);
   if (!allowed) {
     setState(() => _isLoading = false);
     return;

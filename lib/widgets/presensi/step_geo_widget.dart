@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../shared/theme.dart';
 import '../../widgets/app_dialog.dart';
+import '../../helpers/permission_helper.dart';
 
 class StepGeoWidget extends StatefulWidget {
   final int modeId;
@@ -65,7 +65,7 @@ class _StepGeoWidgetState extends State<StepGeoWidget> {
   Future<void> _checkLocation() async {
     setState(() => _loadingLocation = true);
 
-    final bool allowed = await _checkLocationPermission();
+    final allowed = await PermissionHelper.requestLocation(context: context);
     if (!allowed) {
       setState(() => _loadingLocation = false);
       return;
@@ -140,50 +140,6 @@ class _StepGeoWidgetState extends State<StepGeoWidget> {
         AppDialog.show(context, message: "Gagal mendapatkan lokasi: $e");
       }
     }
-  }
-
-  Future<bool> _checkLocationPermission() async {
-    var status = await Permission.location.status;
-    
-    if (status.isGranted) return true;
-
-    if (status.isDenied) {
-      status = await Permission.location.request();
-      if (status.isGranted) return true;
-    }
-
-    if (status.isPermanentlyDenied || status.isDenied) {
-      _showPermissionDialog(
-        "Izin Lokasi Dibutuhkan",
-        "Tidak dapat melakukan lacak lokasi. Mohon izinkan akses GPS perangkat terlebih dahulu, buka pengaturan di\n\nPengaturan > Aplikasi > Presensi > Izin > Posisi.",
-      );
-    }
-    return false;
-  }
-
-  void _showPermissionDialog(String title, String message) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        content: Text(message),
-        actions: [
-          TextButton(
-            child: const Text("Nanti Saja", style: TextStyle(color: Colors.grey)),
-            onPressed: () => Navigator.pop(context),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              openAppSettings();
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-            child: const Text("Buka Pengaturan"),
-          ),
-        ],
-      ),
-    );
   }
 
   double get _radiusLimit => widget.modeId == 1
