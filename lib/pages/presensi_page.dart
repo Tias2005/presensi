@@ -96,8 +96,20 @@ class _PresensiPageState extends State<PresensiPage> {
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['data'] != null) {
-        _isCheckOut = true;
-        _selectedModeId = data['data']['id_kategori_kerja'];
+
+        final presensi = data['data'];
+
+        if (presensi['jam_pulang'] == null) {
+
+          _isCheckOut = true;
+          _selectedModeId = presensi['id_kategori_kerja'];
+
+        } else {
+
+          _isCheckOut = false;
+          _selectedModeId = null;
+        }
+
         _currentStep = 1;
       }
     }

@@ -54,6 +54,26 @@ class DetailPresensiDialog extends StatelessWidget {
 
               _row("Waktu Masuk", detail['jam_masuk']),
               _row("Waktu Pulang", detail['jam_pulang']),
+              if (detail['is_auto_checkout'] == true)
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    "Checkout otomatis oleh sistem",
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
               _row("Lokasi Masuk", detail['lokasi_masuk']),
               _row("Lokasi Pulang", detail['lokasi_pulang']),
               _row(
