@@ -323,16 +323,6 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
     }
   }
 
-  int get currentStepUIIndex {
-    switch (_currentStep) {
-      case LivenessStep.none: return 1;
-      case LivenessStep.blink: return 2;
-      case LivenessStep.smile: return 3;
-      case LivenessStep.turnHead: return 4;
-      case LivenessStep.done: return 4;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_camera == null || !_camera!.value.isInitialized) {
@@ -359,7 +349,7 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
                 SizedBox(
                   width: 200,
                   child: LinearProgressIndicator(
-                    value: currentStepUIIndex / totalSteps,
+                    value: (_currentStepIndex + 1) / totalSteps,
                     backgroundColor: Colors.white24,
                     valueColor: const AlwaysStoppedAnimation(Colors.green),
                   ),
