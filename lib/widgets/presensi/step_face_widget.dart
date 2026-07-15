@@ -189,7 +189,7 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
       List<double> registered = _parseVector(vectorData);
       List<double> current = _extract(File(photo.path), face);
 
-      final score = _cosineDistance(registered, current);
+      final score = _cosineSimilarity(registered, current);
 
       if (score > 0.60) {
         _isActive = false;
@@ -260,7 +260,7 @@ class _StepFaceWidgetState extends State<StepFaceWidget> {
     return emb.map((e) => e / norm).toList();
   }
 
-  double _cosineDistance(List<double> e1, List<double> e2) {
+  double _cosineSimilarity(List<double> e1, List<double> e2) {
     double dot = 0, n1 = 0, n2 = 0;
     for (int i = 0; i < e1.length; i++) {
       dot += e1[i] * e2[i];

@@ -1,16 +1,62 @@
-# presensi
+# Presensi Mobile
 
-A new Flutter project.
+Aplikasi mobile presensi karyawan berbasis Flutter yang memanfaatkan Face Recognition, Liveness Detection, dan Geolocation sebagai validasi kehadiran. Aplikasi ini merupakan bagian dari sistem presensi karyawan pada penelitian tugas akhir.
 
-## Getting Started
+## Fitur
 
-This project is a starting point for a Flutter application.
+- Login pengguna
+- Registrasi wajah menggunakan Face Recognition
+- Liveness Detection (blink, smile, head movement)
+- Presensi Check In & Check Out
+- Validasi lokasi menggunakan Geolocation
+- Riwayat presensi
+- Kalender presensi
+- Notifikasi menggunakan Firebase Cloud Messaging (FCM)
 
-A few resources to get you started if this is your first Flutter project:
+## Teknologi
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- Flutter
+- Dart
+- Laravel REST API
+- Google ML Kit Face Detection
+- TensorFlow Lite (MobileFaceNet)
+- Firebase Cloud Messaging
+- Flutter Map
+- Geolocator
+- Shared Preferences
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Instalasi
+
+Clone repository
+
+```bash
+git clone https://github.com/Tias2005/presensi.git
+cd presensi
+```
+
+Install dependency
+
+```bash
+flutter pub get
+```
+
+Jalankan aplikasi
+
+```bash
+flutter run
+```
+
+## Struktur Proyek
+
+```
+lib/
+assets/
+├── models/
+├── logo/
+android/
+ios/
+```
+
+## Catatan
+
+Aplikasi ini membutuhkan backend Laravel sebagai REST API serta konfigurasi Firebase untuk fitur push notification.
